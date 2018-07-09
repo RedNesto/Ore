@@ -11,6 +11,8 @@ import play.api.cache.SyncCacheApi
 
 import scala.concurrent.{ExecutionContext, Future}
 
+import db.ObjectId
+
 package object TagAlias {
   type ProjectTag = models.project.Tag
 }
@@ -55,10 +57,10 @@ case class PendingVersion(projects: ProjectBase,
     for (dependency <-  this.underlying.dependencies) {
       if (factory.dependencyVersionRegex.pattern.matcher(dependency.version).matches()) {
         if (dependency.pluginId.equalsIgnoreCase(Dependency.SpongeApiId)) {
-          ghostFlags = ghostFlags :+ Tag(None, List(), "Sponge", dependency.version, TagColors.Sponge)
+          ghostFlags = ghostFlags :+ Tag(ObjectId.Uninitialized, List(), "Sponge", dependency.version, TagColors.Sponge)
         }
         if (dependency.pluginId.equalsIgnoreCase(Dependency.ForgeId)) {
-          ghostFlags = ghostFlags :+ Tag(None, List(), "Forge", dependency.version, TagColors.Forge)
+          ghostFlags = ghostFlags :+ Tag(ObjectId.Uninitialized, List(), "Forge", dependency.version, TagColors.Forge)
         }
       }
     }

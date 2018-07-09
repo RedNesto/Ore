@@ -92,7 +92,7 @@ final class Application @Inject()(data: DataHelper,
 
 
     val canHideProjects = request.data.globalPerm(HideProjects)
-    val currentUserId = request.data.currentUser.flatMap(_.id).getOrElse(-1)
+    val currentUserId = request.data.currentUser.map(_.id.value).getOrElse(-1)
 
     val ordering = sort.flatMap(ProjectSortingStrategies.withId).getOrElse(ProjectSortingStrategies.Default)
     // TODO platform filter is not implemented
@@ -152,7 +152,7 @@ final class Application @Inject()(data: DataHelper,
     val offset = page * limit
 
     val data = this.service.DB.db.run(queryQueue.result).flatMap { list =>
-      service.DB.db.run(queryReviews(list.map(_._1.id.get)).result).map { reviewList =>
+      service.DB.db.run(queryReviews(list.map(_._1.id.value)).result).map { reviewList =>
         reviewList.groupBy(_._1.versionId)
       } map { reviewsByVersion =>
         (list, reviewsByVersion)
@@ -161,7 +161,7 @@ final class Application @Inject()(data: DataHelper,
       val reviewData = reviewsByVersion.mapValues { reviews =>
 
         reviews.filter { case (review, _) =>
-          review.createdAt.isDefined && review.endedAt.isEmpty
+          review.createdAt.unsafeToOption.isDefined && review.endedAt.isEmpty
         }.sorted(Review.ordering).headOption.map { case (r, a) =>
           (r, true, a) // Unfinished Review
         } orElse reviews.sorted(Review.ordering).headOption.map { case (r, a) =>
@@ -170,7 +170,7 @@ final class Application @Inject()(data: DataHelper,
       }
 
       list.map { case (v, p, c, a, u) =>
-        (v, p, c, a, u, reviewData.getOrElse(v.id.get, None))
+        (v, p, c, a, u, reviewData.getOrElse(v.id.value, None))
       }
     }
     data map { list =>
@@ -320,26 +320,23 @@ final class Application @Inject()(data: DataHelper,
     */
   def showActivities(user: String): Action[AnyContent] = (Authenticated andThen PermissionAction[AuthRequest](ReviewProjects)) async { implicit request =>
     this.users.withName(user).semiFlatMap { u =>
-      val activities: Future[Seq[(Object, Option[Project])]] = u.id match {
-        case None => Future.successful(Seq.empty)
-        case Some(id) =>
-          val reviews = this.service.access[Review](classOf[Review])
-            .filter(_.userId === id)
-            .map(_.take(20).map { review => review ->
-              this.service.access[Version](classOf[Version]).filter(_.id === review.versionId).flatMap { version =>
-                this.projects.find(_.id === version.head.projectId).value
-              }
-            })
-          val flags = this.service.access[Flag](classOf[Flag])
-            .filter(_.resolvedBy === id)
-            .map(_.take(20).map(flag => flag -> this.projects.find(_.id === flag.projectId).value))
+      val id = u.id.value
+      val reviews = this.service.access[Review](classOf[Review])
+        .filter(_.userId === id)
+        .map(_.take(20).map { review => review ->
+          this.service.access[Version](classOf[Version]).filter(_.id === review.versionId).flatMap { version =>
+            this.projects.find(_.id === version.head.projectId).value
+          }
+        })
+      val flags = this.service.access[Flag](classOf[Flag])
+        .filter(_.resolvedBy === id)
+        .map(_.take(20).map(flag => flag -> this.projects.find(_.id === flag.projectId).value))
 
-          val allActivities = reviews.flatMap(r => flags.map(_ ++ r))
+      val allActivities = reviews.flatMap(r => flags.map(_ ++ r))
 
-          allActivities.flatMap(Future.traverse(_) {
-            case (k, fv) => fv.map(k -> _)
-          }.map(_.sortWith(sortActivities)))
-      }
+      val activities = allActivities.flatMap(Future.traverse(_) {
+        case (k, fv) => fv.map(k -> _)
+      }.map(_.sortWith(sortActivities)))
       activities.map(a => Ok(views.users.admin.activity(u, a)))
     }.getOrElse(NotFound)
   }
