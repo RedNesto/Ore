@@ -136,20 +136,22 @@ trait ProjectFactory {
     *
     * @return Upload error if any
     */
-  def getUploadError(user: User): Option[String] = {
-    if (this.isPgpEnabled) {
-      // Make sure user has a key
-      if (user.pgpPubKey.isEmpty)
-        return Some("error.pgp.noPubKey")
-      // Make sure the user has waited long enough to use a key
-      if (!user.isPgpPubKeyReady)
-        return Some("error.pgp.keyChangeCooldown")
+    def getUploadError(user: User): EitherT[Future, String, Unit] = {
+      if (user.isLocked) EitherT.leftT[Future, Unit]("error.user.locked")
+      else if (this.isPgpEnabled)  {
+        if(user.pgpPubKey.isEmpty) EitherT.leftT[Future, Unit]("error.pgp.noPubKey")
+        else {
+          EitherT(
+            user
+            .projects
+            .size
+            .map(xs => !user.isPgpPubKeyReady && xs != 0)
+            .map(hasCooldown => Either.cond(hasCooldown, (), "error.pgp.keyChangeCooldown"))
+          )
+        }
+      }
+      else EitherT.rightT[Future, String](())
     }
-    if (user.isLocked)
-      return Some("error.user.locked")
-    None
-  }
-
   /**
     * Starts the construction process of a [[Project]].
     *
