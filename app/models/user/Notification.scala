@@ -4,13 +4,12 @@ import java.sql.Timestamp
 
 import db.Model
 import db.impl.NotificationTable
-import db.impl.model.OreModel
-import db.impl.table.ModelKeys._
 import ore.user.UserOwned
 import ore.user.notification.NotificationTypes.NotificationType
 import util.instances.future._
-
 import scala.concurrent.{ExecutionContext, Future}
+
+import db.impl.access.UserBase
 
 /**
   * Represents a [[User]] notification.
@@ -22,18 +21,17 @@ import scala.concurrent.{ExecutionContext, Future}
   * @param messageArgs      The unlocalized message to display, with the
   *                         parameters to use when localizing
   * @param action           Action to perform on click
-  * @param read             True if notification has been read
+  * @param isRead             True if notification has been read
   */
-case class Notification(override val id: Option[Int] = None,
-                        override val createdAt: Option[Timestamp] = None,
-                        override val userId: Int = -1,
+case class Notification(id: Option[Int] = None,
+                        createdAt: Option[Timestamp] = None,
+                        userId: Int = -1,
                         originId: Int,
                         notificationType: NotificationType,
                         messageArgs: List[String],
                         action: Option[String] = None,
-                        private var read: Boolean = false)
-                        extends OreModel(id, createdAt)
-                          with UserOwned {
+                        isRead: Boolean = false)
+                        extends Model with UserOwned {
   //TODO: Would be neat to have a NonEmptyList to get around guarding against this
   require(messageArgs.nonEmpty, "Notification created with no message arguments")
 
@@ -45,25 +43,8 @@ case class Notification(override val id: Option[Int] = None,
     *
     * @return User from which this originated from
     */
-  def origin(implicit ec: ExecutionContext): Future[User] =
-    this.userBase.get(this.originId).getOrElse(throw new NoSuchElementException("Get on None"))
-
-  /**
-    * Returns true if this notification has been read.
-    *
-    * @return True if read
-    */
-  def isRead: Boolean = this.read
-
-  /**
-    * Sets this notification as read or unread.
-    *
-    * @param read True if has been read
-    */
-  def setRead(read: Boolean): Future[Int] = Defined {
-    this.read = read
-    update(Read)
-  }
+  def origin(implicit ec: ExecutionContext, userBase: UserBase): Future[User] =
+    userBase.get(this.originId).getOrElse(throw new NoSuchElementException("Get on None"))
 
   override def copyWith(id: Option[Int], theTime: Option[Timestamp]): Model = this.copy(id = id, createdAt = theTime)
 

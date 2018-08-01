@@ -6,13 +6,14 @@ import db.impl.OrePostgresDriver.api._
 import db.{ModelFilter, ModelService}
 import form.OreForms
 import javax.inject.Inject
+
 import models.project.{Page, Project}
 import models.user.{LoggedAction, LoggedActionContext, UserActionLogger}
 import ore.permission.EditPages
 import ore.{OreConfig, OreEnv, StatTracker}
 import play.api.cache.AsyncCacheApi
 import play.api.i18n.MessagesApi
-import security.spauth.SingleSignOnConsumer
+import security.spauth.{SingleSignOnConsumer, SpongeAuthApi}
 import util.StringUtils._
 import views.html.projects.{pages => views}
 import util.instances.future._
@@ -25,15 +26,17 @@ import play.api.mvc.{Action, AnyContent}
   * Controller for handling Page related actions.
   */
 class Pages @Inject()(forms: OreForms,
-                      stats: StatTracker,
-                      implicit override val bakery: Bakery,
-                      implicit override val cache: AsyncCacheApi,
-                      implicit override val sso: SingleSignOnConsumer,
-                      implicit override val messagesApi: MessagesApi,
-                      implicit override val env: OreEnv,
-                      implicit override val config: OreConfig,
-                      implicit override val service: ModelService)(implicit val ec: ExecutionContext)
-                      extends OreBaseController {
+                      stats: StatTracker)(
+    implicit val ec: ExecutionContext,
+    bakery: Bakery,
+    cache: AsyncCacheApi,
+    sso: SingleSignOnConsumer,
+    messagesApi: MessagesApi,
+    env: OreEnv,
+    config: OreConfig,
+    service: ModelService,
+    auth: SpongeAuthApi,
+) extends OreBaseController {
 
   private val self = controllers.project.routes.Pages
 
@@ -127,7 +130,7 @@ class Pages @Inject()(forms: OreForms,
     * @return Rendered content
     */
   def showPreview() = Action { implicit request =>
-    Ok(Page.Render((request.body.asJson.get \ "raw").as[String]))
+    Ok(Page.render((request.body.asJson.get \ "raw").as[String]))
   }
 
   /**
@@ -147,11 +150,11 @@ class Pages @Inject()(forms: OreForms,
         val parentId = pageData.parentId.getOrElse(-1)
         //noinspection ComparingUnrelatedTypes
         data.project.rootPages.flatMap { rootPages =>
-          if (parentId != -1 && !rootPages.filterNot(_.name.equals(Page.HomeName)).exists(_.id.get == parentId)) {
+          if (parentId != -1 && !rootPages.filterNot(_.name.equals(Page.homeName)).exists(_.id.get == parentId)) {
             Future.successful(BadRequest("Invalid parent ID."))
           } else {
             val content = pageData.content
-            if (page.equals(Page.HomeName) && (content.isEmpty || content.get.length < Page.MinLength)) {
+            if (page.equals(Page.homeName) && (content.isEmpty || content.get.length < Page.minLength)) {
               Future.successful(Redirect(self.show(author, slug, page)).withError("error.minLength"))
             } else {
               val parts = page.split("/")
@@ -165,16 +168,13 @@ class Pages @Inject()(forms: OreForms,
                 val pageName = pageData.name.getOrElse(parts(0))
                 data.project.getOrCreatePage(pageName, parentId, pageData.content)
               }
-              created flatMap { createdPage =>
-                if (pageData.content.isDefined) {
+              created.flatMap { createdPage =>
+                pageData.content.fold(Future.successful(createdPage)) { newPage =>
                   val oldPage = createdPage.contents
-                  val newPage = pageData.content.get
-                  UserActionLogger.log(request.request, LoggedAction.ProjectPageEdited, createdPage.id.getOrElse(-1), newPage, oldPage)
-                  createdPage.setContents(newPage)
-                } else Future.successful(createdPage)
-              } map { _ =>
-                Redirect(self.show(author, slug, page))
-              }
+                  UserActionLogger.log(request.request, LoggedAction.ProjectPageEdited, createdPage.id.getOrElse(-1), newPage, oldPage) *>
+                    service.update(createdPage.copy(contents = newPage))
+                }
+              }.as(Redirect(self.show(author, slug, page)))
             }
           }
         }

@@ -9,6 +9,7 @@ import db.ModelService
 import discourse.OreDiscourseApi
 import form.OreForms
 import javax.inject.Inject
+
 import models.project.{Note, Project, VisibilityTypes}
 import models.user._
 import ore.permission._
@@ -19,9 +20,10 @@ import ore.user.MembershipDossier._
 import ore.{OreConfig, OreEnv, StatTracker}
 import play.api.cache.{AsyncCacheApi, SyncCacheApi}
 import play.api.i18n.MessagesApi
-import security.spauth.SingleSignOnConsumer
+import security.spauth.{SingleSignOnConsumer, SpongeAuthApi}
 import _root_.util.StringUtils._
 import com.github.tminglei.slickpg.InetString
+
 import ore.permission.scope.GlobalScope
 import views.html.{projects => views}
 import db.impl.OrePostgresDriver.api._
@@ -43,17 +45,19 @@ import util.syntax._
   */
 class Projects @Inject()(stats: StatTracker,
                          forms: OreForms,
-                         factory: ProjectFactory,
-                         implicit val syncCache: SyncCacheApi,
-                         implicit override val cache: AsyncCacheApi,
-                         implicit override val bakery: Bakery,
-                         implicit override val sso: SingleSignOnConsumer,
-                         implicit val forums: OreDiscourseApi,
-                         implicit override val messagesApi: MessagesApi,
-                         implicit override val env: OreEnv,
-                         implicit override val config: OreConfig,
-                         implicit override val service: ModelService)(implicit val ec: ExecutionContext)
-                         extends OreBaseController {
+                         factory: ProjectFactory)(
+    implicit val ec: ExecutionContext,
+    syncCache: SyncCacheApi,
+    cache: AsyncCacheApi,
+    bakery: Bakery,
+    sso: SingleSignOnConsumer,
+    auth: SpongeAuthApi,
+    forums: OreDiscourseApi,
+    messagesApi: MessagesApi,
+    env: OreEnv,
+    config: OreConfig,
+    service: ModelService
+) extends OreBaseController {
 
 
   implicit val fileManager: ProjectFiles = factory.fileManager
@@ -159,7 +163,7 @@ class Projects @Inject()(stats: StatTracker,
 
                 val authors = pendingProject.file.meta.get.getAuthors.asScala
                 (
-                  Future.sequence(authors.filterNot(_.equals(currentUser.username)).map(this.users.withName(_).value)),
+                  Future.sequence(authors.filterNot(_.equals(currentUser.name)).map(users.withName(_).value)),
                   this.forums.countUsers(authors.toList),
                   pendingProject.underlying.owner.user
                 ).parMapN { (users, registered, owner) =>
@@ -233,7 +237,7 @@ class Projects @Inject()(stats: StatTracker,
     * @return Redirect to project page.
     */
   def showProjectById(pluginId: String): Action[AnyContent] = OreAction async { implicit request =>
-    this.projects.withPluginId(pluginId).fold(notFound) { project =>
+    projects.withPluginId(pluginId).fold(notFound) { project =>
       Redirect(self.show(project.ownerName, project.slug))
     }
   }
@@ -270,7 +274,7 @@ class Projects @Inject()(stats: StatTracker,
           for {
             poster <- {
               OptionT.fromOption[Future](formData.poster)
-                .flatMap(posterName => this.users.requestPermission(request.user, posterName, PostAsOrganization))
+                .flatMap(posterName => users.requestPermission(request.user, posterName, PostAsOrganization))
                 .getOrElse(request.user)
             }
             errors <- this.forums.postDiscussionReply(data.project, poster, formData.content)
@@ -323,8 +327,8 @@ class Projects @Inject()(stats: StatTracker,
     */
   def showIcon(author: String, slug: String): Action[AnyContent] = Action async { implicit request =>
     // TODO maybe instead of redirect cache this on ore?
-    this.projects.withSlug(author, slug).semiFlatMap { project =>
-      this.projects.fileManager.getIconPath(project) match {
+    projects.withSlug(author, slug).semiFlatMap { project =>
+      projects.fileManager.getIconPath(project) match {
         case None =>
           project.owner.user.map(_.avatarUrl.map(Redirect(_)).getOrElse(NotFound))
         case Some(iconPath) =>
@@ -403,30 +407,20 @@ class Projects @Inject()(stats: StatTracker,
   def setInviteStatus(id: Int, status: String): Action[AnyContent] = Authenticated.async { implicit request =>
     val user = request.user
     user.projectRoles.get(id).semiFlatMap { role =>
-      role.project.map { project =>
+      role.project.flatMap { project =>
         val dossier: MembershipDossier {
-  type MembersTable = ProjectMembersTable
+          type MembersTable = ProjectMembersTable
+          type MemberType = ProjectMember
+          type RoleTable = ProjectRoleTable
+          type ModelType = Project
+          type RoleType = ProjectRole
+        } = project.memberships
 
-  type MemberType = ProjectMember
-
-  type RoleTable = ProjectRoleTable
-
-  type ModelType = Project
-
-  type RoleType = ProjectRole
-} = project.memberships
         status match {
-          case STATUS_DECLINE =>
-            dossier.removeRole(role)
-            Ok
-          case STATUS_ACCEPT =>
-            role.setAccepted(true)
-            Ok
-          case STATUS_UNACCEPT =>
-            role.setAccepted(false)
-            Ok
-          case _ =>
-            BadRequest
+          case STATUS_DECLINE  => dossier.removeRole(role).as(Ok)
+          case STATUS_ACCEPT   => service.update(role.copy(isAccepted = true)).as(Ok)
+          case STATUS_UNACCEPT => service.update(role.copy(isAccepted = false)).as(Ok)
+          case _               => Future.successful(BadRequest)
         }
       }
     }.getOrElse(NotFound)
@@ -466,10 +460,10 @@ class Projects @Inject()(stats: StatTracker,
           dossier.removeRole(role)
           Ok
         case STATUS_ACCEPT =>
-          role.setAccepted(true)
+          service.update(role.copy(isAccepted = true))
           Ok
         case STATUS_UNACCEPT =>
-          role.setAccepted(false)
+          service.update(role.copy(isAccepted = false))
           Ok
         case _ =>
           BadRequest
@@ -507,7 +501,7 @@ class Projects @Inject()(stats: StatTracker,
         Redirect(self.showSettings(author, slug)).withError("error.noFile")
       case Some(tmpFile) =>
         val data = request.data
-        val pendingDir = this.projects.fileManager.getPendingIconDir(data.project.ownerName, data.project.name)
+        val pendingDir = projects.fileManager.getPendingIconDir(data.project.ownerName, data.project.name)
         if (Files.notExists(pendingDir))
           Files.createDirectories(pendingDir)
         Files.list(pendingDir).iterator().asScala.foreach(Files.delete)
@@ -526,7 +520,7 @@ class Projects @Inject()(stats: StatTracker,
     */
   def resetIcon(author: String, slug: String): Action[AnyContent] = SettingsEditAction(author, slug) { implicit request =>
     val data = request.data
-    val fileManager = this.projects.fileManager
+    val fileManager = projects.fileManager
     fileManager.getIconPath(data.project).foreach(Files.delete)
     fileManager.getPendingIconPath(data.project).foreach(Files.delete)
     UserActionLogger.log(request.request, LoggedAction.ProjectIconChanged, data.project.id.getOrElse(-1), "", "") //todo data
@@ -545,7 +539,7 @@ class Projects @Inject()(stats: StatTracker,
   def showPendingIcon(author: String, slug: String): Action[AnyContent] = ProjectAction(author, slug) { implicit request =>
     val data = request.data
     implicit val r: Requests.OreRequest[AnyContent] = request.request
-    this.projects.fileManager.getPendingIconPath(data.project) match {
+    projects.fileManager.getPendingIconPath(data.project) match {
       case None => notFound
       case Some(path) => showImage(path)
     }
@@ -560,7 +554,7 @@ class Projects @Inject()(stats: StatTracker,
   def removeMember(author: String, slug: String): Action[AnyContent] = SettingsEditAction(author, slug).async { implicit request =>
     val res = for {
       name <- bindFormOptionT[Future](this.forms.ProjectMemberRemove)
-      user <- this.users.withName(name)
+      user <- users.withName(name)
     } yield {
       val project = request.data.project
       project.memberships.removeMember(user)
@@ -609,7 +603,7 @@ class Projects @Inject()(stats: StatTracker,
       newName <- bindFormEitherT[Future](this.forms.ProjectRename)(_ => BadRequest).map(compact)
       available <- EitherT.right[Result](projects.isNamespaceAvailable(author, slugify(newName)))
       _ <- EitherT.cond[Future](available, (), Redirect(self.showSettings(author, slug)).withError("error.nameUnavailable"))
-      _ <- EitherT.right[Result](this.projects.rename(project, newName))
+      _ <- EitherT.right[Result](projects.rename(project, newName))
     } yield {
       val data = request.data
       val oldName = data.project.name
@@ -706,7 +700,7 @@ class Projects @Inject()(stats: StatTracker,
   def delete(author: String, slug: String): Action[AnyContent] = {
     (Authenticated andThen PermissionAction[AuthRequest](HardRemoveProject)).async { implicit request =>
       getProject(author, slug).map { project =>
-        this.projects.delete(project)
+        projects.delete(project)
         UserActionLogger.log(request, LoggedAction.ProjectVisibilityChange, project.id.getOrElse(-1), "null", project.visibility.nameKey)
         Redirect(ShowHome).withSuccess(request.messages.apply("project.deleted", project.name))
       }.merge
@@ -757,7 +751,7 @@ class Projects @Inject()(stats: StatTracker,
   def showNotes(author: String, slug: String): Action[AnyContent] = {
     (Authenticated andThen PermissionAction[AuthRequest](ReviewFlags)).async { implicit request =>
       getProject(author, slug).semiFlatMap { project =>
-        Future.sequence(project.getNotes().map(note => users.get(note.user).value.map(user => (note, user)))) map { notes =>
+        Future.sequence(project.decodeNotes.map(note => users.get(note.user).value.map(user => (note, user)))) map { notes =>
           Ok(views.admin.notes(project, notes))
         }
       }.merge

@@ -6,14 +6,16 @@ import scala.concurrent.Future
 
 import com.google.common.base.Preconditions.checkNotNull
 import db.table.ModelTable
-import db.table.key.Key
 
 import scala.language.implicitConversions
 
 /**
   * Represents a Model that may or may not exist in the database.
   */
-abstract class Model(val id: Option[Int], val createdAt: Option[Timestamp]) { self =>
+abstract class Model { self =>
+
+  def id: Option[Int]
+  def createdAt: Option[Timestamp]
 
   /** Self referential type */
   type M <: Model { type M = self.M }
@@ -22,28 +24,10 @@ abstract class Model(val id: Option[Int], val createdAt: Option[Timestamp]) { se
   /** The model's schema */
   type S <: ModelSchema[M]
 
-  /** The ModelService that this Model was processed with */
-  implicit var service: ModelService = _
-
-  private var _isProcessed = false
-
-  implicit def convertKey[A](key: Key[_, A]): Key[M, A] = {
-    if (!key.isInstanceOf[Key[M @unchecked, A @unchecked]])
-      throw new RuntimeException("tried to use key on wrong model")
-    key.asInstanceOf[Key[M, A]]
-  }
-
-  /**
-    * Updates the specified key in the model's table.
-    *
-    * @param key Model key to update
-    */
-  def update[A](key: Key[M, A]): Future[Int] = Defined(key.update(this.asInstanceOf[M]))
-
   /**
     * Removes this model from it's table.
     */
-  def remove(): Future[Int] = Defined(this.service.delete(this.asInstanceOf[M]))
+  def remove()(implicit service: ModelService): Future[Int] = Defined(service.delete(this.asInstanceOf[M]))
 
   /**
     * Returns true if this Project is defined in the database.
@@ -59,11 +43,8 @@ abstract class Model(val id: Option[Int], val createdAt: Option[Timestamp]) { se
     *                 not yet been processed
     * @return         ModelActions
     */
-  def schema(implicit service: ModelService = null): S = {
-    if (this.service == null)
-      this.service = service
-    checkNotNull(this.service, "service is null", "")
-    this.service.getSchemaByModel(getClass).asInstanceOf[S]
+  def schema(implicit service: ModelService): S = {
+    service.getSchemaByModel(getClass).asInstanceOf[S]
   }
 
   /**
@@ -74,16 +55,6 @@ abstract class Model(val id: Option[Int], val createdAt: Option[Timestamp]) { se
     * @return         Copy of model
     */
   def copyWith(id: Option[Int], theTime: Option[Timestamp]): Model
-
-  /**
-    * Returns true if this model has been processed internally by some
-    * ModelService and has had it's bindings processed.
-    *
-    * @return True if processed
-    */
-  def isProcessed: Boolean = this._isProcessed
-
-  protected[db] def setProcessed(processed: Boolean): Unit = this._isProcessed = processed
 
   protected def Defined[R](f: => R): R = {
     if (isDefined)

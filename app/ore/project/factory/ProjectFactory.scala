@@ -5,11 +5,13 @@ import java.nio.file.StandardCopyOption
 
 import akka.actor.ActorSystem
 import com.google.common.base.Preconditions._
+
 import db.ModelService
 import db.impl.OrePostgresDriver.api._
-import db.impl.access.{ProjectBase, UserBase}
+import db.impl.access.ProjectBase
 import discourse.OreDiscourseApi
 import javax.inject.Inject
+
 import models.project.TagColors.TagColor
 import models.project._
 import models.user.role.ProjectRole
@@ -23,6 +25,7 @@ import ore.project.factory.TagAlias.ProjectTag
 import ore.project.io.{InvalidPluginFileException, PluginFile, PluginUpload, ProjectFiles}
 import ore.user.notification.NotificationTypes
 import org.spongepowered.plugin.meta.PluginMetadata
+
 import play.api.cache.SyncCacheApi
 import play.api.i18n.Messages
 import security.pgp.PGPVerifier
@@ -30,7 +33,6 @@ import util.StringUtils._
 import util.functional.{EitherT, OptionT}
 import util.instances.future._
 import util.syntax._
-
 import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.Duration
@@ -45,19 +47,18 @@ import ore.user.MembershipDossier
   */
 trait ProjectFactory {
 
-  implicit val service: ModelService
-  implicit val users: UserBase = this.service.getModelBase(classOf[UserBase])
-  implicit val projects: ProjectBase = this.service.getModelBase(classOf[ProjectBase])
+  implicit def service: ModelService
+  implicit def projects: ProjectBase = ProjectBase.fromService
 
-  val fileManager: ProjectFiles = this.projects.fileManager
-  val cacheApi: SyncCacheApi
-  val actorSystem: ActorSystem
+  def fileManager: ProjectFiles = this.projects.fileManager
+  def cacheApi: SyncCacheApi
+  def actorSystem: ActorSystem
   val pgp: PGPVerifier = new PGPVerifier
   val dependencyVersionRegex: Regex = "^[0-9a-zA-Z\\.\\,\\[\\]\\(\\)-]+$".r
 
-  implicit val config: OreConfig
-  implicit val forums: OreDiscourseApi
-  implicit val env: OreEnv = this.fileManager.env
+  implicit def config: OreConfig
+  implicit def forums: OreDiscourseApi
+  implicit def env: OreEnv = this.fileManager.env
 
   var isPgpEnabled: Boolean = this.config.security.get[Boolean]("requirePgp")
 
@@ -94,7 +95,7 @@ trait ProjectFactory {
 
     // move uploaded files to temporary directory while the project creation
     // process continues
-    val tmpDir = this.env.tmp.resolve(owner.username)
+    val tmpDir = this.env.tmp.resolve(owner.name)
     if (notExists(tmpDir))
       createDirectories(tmpDir)
     val signatureFileExtension = signatureFileName.substring(signatureFileName.lastIndexOf("."))
@@ -346,13 +347,13 @@ trait ProjectFactory {
         val newVersion = Version(
           versionString = pendingVersion.versionString,
           dependencyIds = pendingVersion.dependencyIds,
-          _description = pendingVersion.description,
+          description = pendingVersion.description,
           assets = pendingVersion.assets,
           projectId = project.id.get,
           channelId = channel.id.get,
           fileSize = pendingVersion.fileSize,
           hash = pendingVersion.hash,
-          _authorId = pendingVersion.authorId,
+          authorId = pendingVersion.authorId,
           fileName = pendingVersion.fileName,
           signatureFileName = pendingVersion.signatureFileName
         )
@@ -360,13 +361,12 @@ trait ProjectFactory {
       }
       spongeTag <- addTags(newVersion, SpongeApiId, "Sponge", TagColors.Sponge).value
       forgeTag <- addTags(newVersion, ForgeId, "Forge", TagColors.Forge).value
+      _ <- service.update(project.copy(lastUpdated = this.service.theTime))
     } yield {
       val tags = spongeTag ++ forgeTag
 
       // Notify watchers
       this.actorSystem.scheduler.scheduleOnce(Duration.Zero, NotifyWatchersTask(newVersion, project))
-
-      project.setLastUpdated(this.service.theTime)
 
       uploadPlugin(project, channel, pending.plugin, newVersion)
 
@@ -389,25 +389,24 @@ trait ProjectFactory {
           tag <- {
             if (tagsWithVersion.isEmpty) {
               val tag = Tag(
-                _versionIds = List(newVersion.id.get),
+                versionIds = List(newVersion.id.get),
                 name = tagName,
                 data = dep.version,
                 color = tagColor
               )
-              val newTag = service.access(classOf[ProjectTag]).add(tag)
-              newTag.map(newVersion.addTag)
-              newTag
-
+              for {
+                newTag <- service.access(classOf[ProjectTag]).add(tag)
+                _ <- service.update(newVersion.copy(tagIds = newTag.id.get :: newVersion.tagIds))
+              } yield newTag
             } else {
               val tag = tagsWithVersion.head
-              tag.addVersionId(newVersion.id.get)
-              Future.successful(tag)
+              for {
+                _ <- service.update(tag.copy(versionIds = newVersion.id.get :: tag.versionIds))
+              } yield tag
             }
           }
-        } yield {
-          newVersion.addTag(tag)
-          tag
-        }
+          _ <- service.update(newVersion.copy(tagIds = tag.id.get :: newVersion.tagIds))
+        } yield tag
     }
   }
 

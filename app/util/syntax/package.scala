@@ -11,6 +11,8 @@ package object syntax extends ParallelSyntax {
 
     def as[B](b: B)(implicit F: Functor[F]): F[B] = F.as(fa, b)
 
+    def void(implicit F: Functor[F]): F[Unit] = F.as(fa, ())
+
     def fproduct[B](f: A => B)(implicit F: Functor[F]): F[(A, B)] = F.fproduct(fa)(f)
 
     def tupleLeft[B](b: B)(implicit F: Functor[F]): F[(B, A)] = F.tupleLeft(fa, b)

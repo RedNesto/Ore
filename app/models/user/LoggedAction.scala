@@ -5,38 +5,29 @@ import java.sql.Timestamp
 import scala.collection.immutable
 
 import com.github.tminglei.slickpg.InetString
+
 import controllers.sugar.Requests.AuthRequest
-import db.ModelService
+import db.{Model, ModelService}
 import db.impl.LoggedActionTable
-import db.impl.model.OreModel
 import enumeratum.values.{IntEnum, IntEnumEntry}
 import ore.StatTracker
 import ore.user.UserOwned
+import scala.concurrent.{ExecutionContext, Future}
 
-import scala.concurrent.ExecutionContext
-
-case class LoggedActionModel(override val id: Option[Int] = None,
-                             override val createdAt: Option[Timestamp] = None,
-                             private val _userId: Int,
-                             private val _address: InetString,
-                             private val _action: LoggedAction,
-                             private val _actionContext: LoggedActionContext,
-                             private val _actionContextId: Int,
-                             private val _newState: String,
-                             private val _oldState: String) extends OreModel(id, createdAt) with UserOwned {
+case class LoggedActionModel(id: Option[Int] = None,
+                             createdAt: Option[Timestamp] = None,
+                             userId: Int,
+                             address: InetString,
+                             action: LoggedAction,
+                             actionContext: LoggedActionContext,
+                             actionContextId: Int,
+                             newState: String,
+                             oldState: String) extends Model with UserOwned {
 
   override type T = LoggedActionTable
   override type M = LoggedActionModel
 
   override def copyWith(id: Option[Int], theTime: Option[Timestamp]): LoggedActionModel = this.copy(createdAt = theTime)
-  override def userId: Int = _userId
-
-  def address: InetString = _address
-  def action: LoggedAction = _action
-  def oldState: String = _oldState
-  def newState: String = _newState
-  def contextId: Int = _actionContextId
-  def actionType: LoggedActionContext = _action.context
 }
 
 sealed abstract class LoggedActionContext(val value: Int) extends IntEnumEntry
@@ -78,14 +69,12 @@ case object LoggedAction extends IntEnum[LoggedAction] {
   case object UserPgpKeySaved           extends LoggedAction(15, "UserPgpKeySaved", LoggedActionContext.User, "The users saved a pgp public key")
   case object UserPgpKeyRemoved         extends LoggedAction(16, "UserPgpKeyRemoved", LoggedActionContext.User, "The users removed a pgp public key")
   val values: immutable.IndexedSeq[LoggedAction] = findValues
-
 }
 
 object UserActionLogger {
 
   def log(request: AuthRequest[_], action: LoggedAction, actionContextId: Int, newState: String, oldState: String)
-         (implicit service: ModelService, ex: ExecutionContext){
-
+         (implicit service: ModelService, ex: ExecutionContext): Future[LoggedActionModel] = {
     service.insert(LoggedActionModel(None, None, request.user.userId, InetString(StatTracker.remoteAddress(request.request)), action, action.context, actionContextId, newState, oldState))
   }
 

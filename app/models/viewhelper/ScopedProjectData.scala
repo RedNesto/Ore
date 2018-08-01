@@ -4,9 +4,9 @@ import models.project.{Project, VisibilityTypes}
 import models.user.User
 import ore.permission._
 import play.api.cache.AsyncCacheApi
-
 import scala.concurrent.{ExecutionContext, Future}
 
+import db.ModelService
 import util.syntax._
 
 /**
@@ -16,7 +16,7 @@ object ScopedProjectData {
 
   def cacheKey(project: Project, user: User) = s"""project${project.id.get}foruser${user.id.get}"""
 
-  def of(currentUser: Option[User], project: Project)(implicit ec: ExecutionContext, cache: AsyncCacheApi): Future[ScopedProjectData] = {
+  def of(currentUser: Option[User], project: Project)(implicit ec: ExecutionContext, cache: AsyncCacheApi, service: ModelService): Future[ScopedProjectData] = {
     currentUser.map { user =>
       (
         project.owner.user.flatMap(_.toMaybeOrganization.value).flatMap(orgaOwner => user can PostAsOrganization in orgaOwner),

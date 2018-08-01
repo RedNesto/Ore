@@ -30,7 +30,7 @@ import play.api.i18n.{Lang, MessagesApi}
 import play.api.libs.json.Json
 import play.api.mvc.{Action, AnyContent, Request, Result}
 import play.filters.csrf.CSRF
-import security.spauth.SingleSignOnConsumer
+import security.spauth.{SingleSignOnConsumer, SpongeAuthApi}
 import util.StringUtils._
 import util.syntax._
 import views.html.projects.{versions => views}
@@ -42,7 +42,6 @@ import scala.concurrent.{ExecutionContext, Future}
 
 import util.functional.{EitherT, OptionT}
 import util.instances.future._
-
 import db.impl.VersionTable
 
 /**
@@ -50,18 +49,20 @@ import db.impl.VersionTable
   */
 class Versions @Inject()(stats: StatTracker,
                          forms: OreForms,
-                         factory: ProjectFactory,
-                         forums: OreDiscourseApi,
-                         implicit override val bakery: Bakery,
-                         implicit override val sso: SingleSignOnConsumer,
-                         implicit override val cache: AsyncCacheApi,
-                         implicit override val messagesApi: MessagesApi,
-                         implicit override val env: OreEnv,
-                         implicit override val config: OreConfig,
-                         implicit override val service: ModelService)(implicit val ec: ExecutionContext)
-  extends OreBaseController {
+                         factory: ProjectFactory)(
+    implicit val ec: ExecutionContext,
+    auth: SpongeAuthApi,
+    forums: OreDiscourseApi,
+    bakery: Bakery,
+    sso: SingleSignOnConsumer,
+    cache: AsyncCacheApi,
+    messagesApi: MessagesApi,
+    env: OreEnv,
+    config: OreConfig,
+    service: ModelService
+) extends OreBaseController {
 
-  private val fileManager = this.projects.fileManager
+  private val fileManager = projects.fileManager
   private val self = controllers.project.routes.Versions
   private val warnings = this.service.access[DownloadWarning](classOf[DownloadWarning])
 
@@ -104,10 +105,10 @@ class Versions @Inject()(stats: StatTracker,
       val res = for {
         version <- getVersion(request.data.project, versionString)
         description <- bindFormEitherT[Future](this.forms.VersionDescription)(_ => BadRequest: Result)
+        oldDescription = version.description.getOrElse("")
+        newDescription = description.trim
+        _ <- EitherT.right[Result](service.update(version.copy(description = Some(newDescription))))
       } yield {
-        val oldDescription = version.description.getOrElse("")
-        val newDescription = description.trim
-        version.setDescription(newDescription)
         UserActionLogger.log(request.request, LoggedAction.VersionDescriptionEdited, version.id.getOrElse(-1), newDescription, oldDescription)
         Redirect(self.show(author, slug, versionString))
       }
@@ -127,11 +128,15 @@ class Versions @Inject()(stats: StatTracker,
   def setRecommended(author: String, slug: String, versionString: String): Action[AnyContent] = {
     VersionEditAction(author, slug).async { implicit request =>
       implicit val r: Requests.AuthRequest[AnyContent] = request.request
-      getVersion(request.data.project, versionString).map { version =>
-        request.data.project.setRecommendedVersion(version)
+      val res = for {
+        version <- getVersion(request.data.project, versionString)
+        _ <- EitherT.right[Result](service.update(request.data.project.copy(recommendedVersionId = Some(version.id.get))))
+      } yield {
         UserActionLogger.log(request.request, LoggedAction.VersionAsRecommended, version.id.getOrElse(-1), "recommended version", "listed version")
         Redirect(self.show(author, slug, versionString))
-      }.merge
+      }
+
+      res.merge
     }
   }
 
@@ -147,13 +152,16 @@ class Versions @Inject()(stats: StatTracker,
     (AuthedProjectAction(author, slug, requireUnlock = true)
       andThen ProjectPermissionAction(ReviewProjects)).async { implicit request =>
       implicit val r: Requests.AuthRequest[AnyContent] = request.request
-      getVersion(request.data.project, versionString).map { version =>
-        version.setReviewed(reviewed = true)
-        version.setReviewer(request.user)
-        version.setApprovedAt(this.service.theTime)
+
+      val res = for {
+        version <- getVersion(request.data.project, versionString)
+        _ <- EitherT.right[Result](service.update(version.copy(isReviewed = true, reviewerId = request.user.id.get, approvedAt = Some(service.theTime))))
+      } yield {
         UserActionLogger.log(request.request, LoggedAction.VersionApproved, version.id.getOrElse(-1), "approved", "unapproved")
         Redirect(self.show(author, slug, versionString))
-      }.merge
+      }
+
+      res.merge
     }
   }
 
@@ -240,7 +248,7 @@ class Versions @Inject()(stats: StatTracker,
           EitherT.leftT[Future, PendingVersion](Redirect(call).withErrors(Option(e.getMessage).toList))
       }
     }.map { pendingVersion =>
-      pendingVersion.underlying.setAuthorId(user.id.getOrElse(-1))
+      pendingVersion.copy(underlying = pendingVersion.underlying.copy(authorId = user.id.get)).cache()
       Redirect(self.showCreatorWithMeta(request.data.project.ownerName, slug, pendingVersion.underlying.versionString))
     }.merge
   }
@@ -274,7 +282,7 @@ class Versions @Inject()(stats: StatTracker,
 
   private def pendingOrReal(author: String, slug: String): OptionT[Future, Either[PendingProject, Project]] = {
     // Returns either a PendingProject or existing Project
-    this.projects.withSlug(author, slug)
+    projects.withSlug(author, slug)
       .map[Either[PendingProject, Project]](Right.apply)
       .orElse(OptionT.fromOption[Future](this.factory.getPendingProject(author, slug)).map(Left.apply))
   }
@@ -322,13 +330,15 @@ class Versions @Inject()(stats: StatTracker,
                       .leftFlatMap(identity)
                       .semiFlatMap { _ =>
                         // Update description
-                        versionData.content.foreach { content =>
-                          pendingVersion.underlying.setDescription(content.trim)
+                        val newPendingVersion = versionData.content.fold(pendingVersion) { content =>
+                          val updated = pendingVersion.copy(underlying = pendingVersion.underlying.copy(description = Some(content.trim)))
+                          updated.cache()
+                          updated
                         }
 
-                        pendingVersion.complete.map { newVersion =>
+                        newPendingVersion.complete.map { newVersion =>
                           if (versionData.recommended)
-                            project.setRecommendedVersion(newVersion._1)
+                            service.update(project.copy(recommendedVersionId = Some(newVersion._1.id.get)))
                           addUnstableTag(newVersion._1, versionData.unstable)
                           UserActionLogger.log(request, LoggedAction.VersionUploaded, newVersion._1.id.getOrElse(-1), "published", "null")
                           Redirect(self.show(author, slug, versionString))
@@ -353,10 +363,10 @@ class Versions @Inject()(stats: StatTracker,
   private def addUnstableTag(version: Version, unstable: Boolean) = {
     if (unstable) {
       service.access(classOf[ProjectTag])
-        .filter(t => t.name === "Unstable" && t.data === "").map { tagsWithVersion =>
+        .filter(t => t.name === "Unstable" && t.data === "").flatMap { tagsWithVersion =>
         if (tagsWithVersion.isEmpty) {
           val tag = Tag(
-            _versionIds = List(version.id.get),
+            versionIds = List(version.id.get),
             name = "Unstable",
             data = "",
             color = TagColors.Unstable
@@ -364,13 +374,11 @@ class Versions @Inject()(stats: StatTracker,
           service.access(classOf[ProjectTag]).add(tag).flatMap { tag =>
             // requery the tag because it now includes the id
             service.access(classOf[ProjectTag]).filter(t => t.name === tag.name && t.data === tag.data).map(_.toList.head)
-          } map { newTag =>
-            version.addTag(newTag)
-          }
+          } flatMap(newTag => service.update(version.copy(tagIds = newTag.id.get :: version.tagIds)))
         } else {
           val tag = tagsWithVersion.head
-          tag.addVersionId(version.id.get)
-          version.addTag(tag)
+          service.update(tag.copy(versionIds = version.id.get :: tag.versionIds)) *>
+            service.update(version.copy(tagIds = tag.id.get :: version.tagIds))
         }
       }
     }
@@ -388,7 +396,7 @@ class Versions @Inject()(stats: StatTracker,
     (Authenticated andThen PermissionAction[AuthRequest](HardRemoveVersion)).async { implicit request =>
       implicit val r: Request[AnyContent] = request.request
       getProjectVersion(author, slug, versionString).map { version =>
-        this.projects.deleteVersion(version)
+        projects.deleteVersion(version)
         UserActionLogger.log(request, LoggedAction.VersionDeleted, version.id.getOrElse(-1), "null", "")
         Redirect(self.showList(author, slug, None))
       }.merge
@@ -408,7 +416,7 @@ class Versions @Inject()(stats: StatTracker,
     val res = for {
       comment <- bindFormEitherT[Future](this.forms.NeedsChanges)(_ => BadRequest)
       version <- getVersion(project, versionString)
-      _ <- EitherT.right[Result](this.projects.prepareDeleteVersion(version))
+      _ <- EitherT.right[Result](projects.prepareDeleteVersion(version))
       _ <- EitherT.right[Result](version.setVisibility(VisibilityTypes.SoftDelete, comment, request.user.id.get))
     } yield Redirect(self.showList(author, slug, None))
 
@@ -624,13 +632,12 @@ class Versions @Inject()(stats: StatTracker,
       // warning confirmed and redirect to download
       val downloads = this.service.access[UnsafeDownload](classOf[UnsafeDownload])
       for {
-        user <- this.users.current.value
-        _ <- warn.setConfirmed()
+        user <- users.current.value
         unsafeDownload <- downloads.add(UnsafeDownload(
           userId = user.flatMap(_.id),
           address = addr,
           downloadType = dlType))
-        _ <- warn.setDownload(unsafeDownload)
+        _ <- service.update(warn.copy(isConfirmed = true, downloadId = unsafeDownload.id.get))
       } yield unsafeDownload
     }
   }

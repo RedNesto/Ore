@@ -2,13 +2,10 @@ package models.user
 
 import java.sql.Timestamp
 
-import com.google.common.base.Preconditions._
 import db.impl.OrePostgresDriver.api._
 import db.impl.access.UserBase
-import db.impl.model.OreModel
-import db.impl.table.ModelKeys._
 import db.impl.{OrganizationMembersTable, OrganizationRoleTable, OrganizationTable}
-import db.{Model, Named}
+import db.{Model, ModelService, Named}
 import models.user.role.OrganizationRole
 import ore.organization.OrganizationMember
 import ore.permission.role.{Default, RoleTypes, Trust}
@@ -16,9 +13,9 @@ import ore.permission.scope.OrganizationScope
 import ore.user.{MembershipDossier, UserOwned}
 import ore.{Joinable, Visitable}
 import slick.lifted.{Compiled, Rep, TableQuery}
-
 import scala.concurrent.{ExecutionContext, Future}
 
+import security.spauth.SpongeAuthApi
 import util.functional.OptionT
 
 /**
@@ -29,18 +26,18 @@ import util.functional.OptionT
   *
   * @param id             Unique ID
   * @param createdAt      Date of creation
-  * @param _ownerId        The ID of the [[User]] that owns this organization
+  * @param ownerId        The ID of the [[User]] that owns this organization
   */
-case class Organization(override val id: Option[Int] = None,
-                        override val createdAt: Option[Timestamp] = None,
+case class Organization(id: Option[Int] = None,
+                        createdAt: Option[Timestamp] = None,
                         username: String,
-                        private var _ownerId: Int)
-                        extends OreModel(id, createdAt)
+                        ownerId: Int)
+                        extends Model
                           with UserOwned
                           with OrganizationScope
                           with Named
                           with Visitable
-                          with Joinable[OrganizationMember] {
+                          with Joinable[OrganizationMember, Organization] {
 
   override type M = Organization
   override type T = OrganizationTable
@@ -48,7 +45,7 @@ case class Organization(override val id: Option[Int] = None,
   /**
     * Contains all information for [[User]] memberships.
     */
-  override val memberships: MembershipDossier {
+  override def memberships(implicit service: ModelService): MembershipDossier {
   type MembersTable = OrganizationMembersTable
 
   type MemberType = OrganizationMember
@@ -70,7 +67,7 @@ case class Organization(override val id: Option[Int] = None,
     val roleClass: Class[RoleType] = classOf[OrganizationRole]
     val model: ModelType = Organization.this
 
-    def newMember(userId: Int)(implicit ec: ExecutionContext) = new OrganizationMember(this.model, userId)
+    def newMember(userId: Int)(implicit ec: ExecutionContext): OrganizationMember = new OrganizationMember(this.model, userId)
 
     def clearRoles(user: User): Future[Int] = this.roleAccess.removeAll({ s => (s.userId === user.id.get) && (s.organizationId === id.get) })
 
@@ -81,7 +78,7 @@ case class Organization(override val id: Option[Int] = None,
       * @return Trust of user
       */
     override def getTrust(user: User)(implicit ex: ExecutionContext): Future[Trust] = {
-      this.userBase.service.DB.db.run(Organization.roleForTrustQuery(id.get, user.id.get).result).map { l =>
+      UserBase().service.DB.db.run(Organization.roleForTrustQuery(id.get, user.id.get).result).map { l =>
         l.sortBy(_.roleType.trust).headOption.map(_.roleType.trust).getOrElse(Default)
       }
     }
@@ -93,41 +90,22 @@ case class Organization(override val id: Option[Int] = None,
     *
     * @return User that owns organization
     */
-  override def owner: OrganizationMember = new OrganizationMember(this, this._ownerId)
+  override def owner(implicit service: ModelService): OrganizationMember =
+    new OrganizationMember(this, this.ownerId)
 
-  override def ownerId: Int = this._ownerId
-
-  override def transferOwner(member: OrganizationMember)(implicit ec: ExecutionContext): Future[Int] = {
+  override def transferOwner(member: OrganizationMember)(implicit ec: ExecutionContext, service: ModelService): Future[Organization] = {
     // Down-grade current owner to "Admin"
     for {
-      owner <- this.owner.user
-      roles <- this.memberships.getRoles(owner)
-      memberUser <- member.user
-      memberRoles <- this.memberships.getRoles(memberUser)
-      setOwner <- this.setOwner(memberUser)
-    } yield {
-      roles.filter(_.roleType == RoleTypes.OrganizationOwner)
-        .foreach(_.setRoleType(RoleTypes.OrganizationAdmin))
-
-      memberRoles.foreach(_.setRoleType(RoleTypes.OrganizationOwner))
-
-      setOwner
-    }
-  }
-
-
-  /**
-    * Sets the [[User]] that owns this Organization.
-    *
-    * @param user User that owns this organization
-    */
-  def setOwner(user: User): Future[Int] = {
-    checkNotNull(user, "null user", "")
-    checkArgument(user.isDefined, "undefined user", "")
-    this._ownerId = user.id.get
-    if (isDefined) {
-      update(OrgOwnerId)
-    } else Future.successful(0)
+      (owner, memberUser) <- this.owner.user.zip(member.user)
+      (roles, memberRoles) <- this.memberships.getRoles(owner).zip(this.memberships.getRoles(memberUser))
+      setOwner <- service.update(copy(ownerId = memberUser.id.get))
+      _ <- Future.sequence(
+        roles
+          .filter(_.roleType == RoleTypes.OrganizationOwner)
+          .map(role => service.update(role.copy(roleType = RoleTypes.OrganizationAdmin)))
+      )
+      _ <- Future.sequence(memberRoles.map(role => service.update(role.copy(roleType = RoleTypes.OrganizationOwner))))
+    } yield setOwner
   }
 
   /**
@@ -135,11 +113,11 @@ case class Organization(override val id: Option[Int] = None,
     *
     * @return This Organization as a User
     */
-  def toUser(implicit ec: ExecutionContext): OptionT[Future, User] = this.service.getModelBase(classOf[UserBase]).withName(this.username)
+  def toUser(implicit ec: ExecutionContext, users: UserBase, auth: SpongeAuthApi): OptionT[Future, User] = users.withName(this.username)
 
   override val name: String = this.username
   override def url: String = this.username
-  override val userId: Int = this._ownerId
+  override val userId: Int = this.ownerId
   override def organizationId: Int = this.id.get
   override def copyWith(id: Option[Int], theTime: Option[Timestamp]): Model = this.copy(createdAt = theTime)
 

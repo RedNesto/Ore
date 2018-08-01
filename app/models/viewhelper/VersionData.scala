@@ -10,7 +10,6 @@ import slick.jdbc.JdbcBackend
 
 import scala.concurrent.{ExecutionContext, Future}
 
-import db.impl.access.ProjectBase
 import util.syntax._
 import util.instances.future._
 
@@ -32,7 +31,6 @@ case class VersionData(p: ProjectData, v: Version, c: Channel,
 
 object VersionData {
   def of[A](request: ProjectRequest[A], version: Version)(implicit cache: AsyncCacheApi, db: JdbcBackend#DatabaseDef, ec: ExecutionContext, service: ModelService): Future[VersionData] = {
-    implicit val base: ProjectBase = version.projectBase
     val depsFut = Future.sequence(version.dependencies.map(dep => dep.project.value.map((dep, _))))
 
     (version.channel, version.reviewer.map(_.name).value, depsFut).parMapN {

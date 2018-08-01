@@ -1,34 +1,35 @@
 package util
 
 import com.google.common.base.Preconditions.checkArgument
+
 import db.ModelService
 import db.access.ModelAccess
 import db.impl.access.{ProjectBase, UserBase}
 import discourse.OreDiscourseApi
 import javax.inject.Inject
+
 import models.project.{Channel, Project, ProjectSettings, Version}
 import models.user.User
 import ore.OreConfig
 import ore.project.factory.ProjectFactory
 import play.api.cache.SyncCacheApi
-
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * Utility class for performing some bulk actions on the application data.
   * Typically for testing.
   */
-final class DataHelper @Inject()(config: OreConfig,
+final class DataHelper @Inject()(implicit config: OreConfig,
                                  statusZ: StatusZ,
                                  service: ModelService,
                                  factory: ProjectFactory,
                                  forums: OreDiscourseApi,
                                  cacheApi: SyncCacheApi) {
 
-  implicit private val projects: ProjectBase = this.service.getModelBase(classOf[ProjectBase])
+  private val projects = ProjectBase.fromService(service)
   private val channels: ModelAccess[Channel] = this.service.access[Channel](classOf[Channel])
   private val versions: ModelAccess[Version] = this.service.access[Version](classOf[Version])
-  private val users: UserBase = this.service.getModelBase(classOf[UserBase])
+  private val users = UserBase.fromService(service)
 
   val Logger = play.api.Logger("DataHelper")
 
@@ -57,7 +58,7 @@ final class DataHelper @Inject()(config: OreConfig,
     *
     * @param users Amount of users to create
     */
-  def seed(users: Int, projects: Int, versions: Int, channels: Int)(implicit ec: ExecutionContext): Unit = {
+  def seed(users: Int, projects: Int, versions: Int, channels: Int)(implicit ec: ExecutionContext, service: ModelService): Unit = {
     if (sys.env.getOrElse(statusZ.SpongeEnv, "unknown") != "local") return
     // Note: Dangerous as hell, handle with care
     Logger.info("---- Seeding Ore ----")
@@ -74,7 +75,7 @@ final class DataHelper @Inject()(config: OreConfig,
     var projectNum = 0
     for (i <- 0 until users) {
       Logger.info(Math.ceil(i / users.asInstanceOf[Float] * 100).asInstanceOf[Int].toString + "%")
-      this.users.add(User(id = Some(i), _username = s"User-$i")).map { user =>
+      this.users.add(User(id = Some(i), name = s"User-$i")).map { user =>
         // Create some projects
         for (j <- 0 until projects) {
           val pluginId = s"plugin$projectNum"
@@ -84,7 +85,7 @@ final class DataHelper @Inject()(config: OreConfig,
             .ownerId(user.id.get)
             .name(s"Project$projectNum")
             .build()) map { project =>
-            project.updateSettings(this.service.processor.process(ProjectSettings()))
+            project.updateSettings(ProjectSettings())
             // Now create some additional versions for this project
             var versionNum = 0
             for (k <- 0 until channels) {
@@ -96,12 +97,12 @@ final class DataHelper @Inject()(config: OreConfig,
                     channelId = channel.id.get,
                     fileSize = 1,
                     hash = "none",
-                    _authorId = i,
+                    authorId = i,
                     fileName = "none",
                     signatureFileName = "none")) map { version =>
-                    if (l == 0)
-                      project.setRecommendedVersion(version)
                     versionNum += 1
+                    if (l == 0) service.update(project.copy(recommendedVersionId = Some(version.id.get)))
+                    else Future.unit
                   }
                 }
               }

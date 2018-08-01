@@ -2,6 +2,7 @@ package controllers
 
 import java.sql.Timestamp
 import java.time.Instant
+
 import javax.inject.Inject
 
 import controllers.sugar.Bakery
@@ -27,13 +28,12 @@ import ore.{OreConfig, OreEnv, Platforms}
 import play.api.Logger
 import play.api.cache.AsyncCacheApi
 import play.api.i18n.MessagesApi
-import security.spauth.SingleSignOnConsumer
+import security.spauth.{SingleSignOnConsumer, SpongeAuthApi}
 import util.DataHelper
 import util.functional.OptionT
 import util.syntax._
 import util.instances.future._
 import views.{html => views}
-
 import scala.concurrent.{ExecutionContext, Future}
 
 import play.api.mvc.{Action, ActionBuilder, AnyContent}
@@ -42,15 +42,17 @@ import play.api.mvc.{Action, ActionBuilder, AnyContent}
   * Main entry point for application.
   */
 final class Application @Inject()(data: DataHelper,
-                                  forms: OreForms,
-                                  implicit override val bakery: Bakery,
-                                  implicit override val sso: SingleSignOnConsumer,
-                                  implicit override val messagesApi: MessagesApi,
-                                  implicit override val env: OreEnv,
-                                  implicit override val config: OreConfig,
-                                  implicit override val cache: AsyncCacheApi,
-                                  implicit override val service: ModelService)(implicit val ec: ExecutionContext)
-                                  extends OreBaseController {
+                                  forms: OreForms)(
+    implicit val ec: ExecutionContext,
+    auth: SpongeAuthApi,
+    bakery: Bakery,
+    sso: SingleSignOnConsumer,
+    messagesApi: MessagesApi,
+    env: OreEnv,
+    config: OreConfig,
+    cache: AsyncCacheApi,
+    service: ModelService
+) extends OreBaseController {
 
   private def FlagAction = Authenticated andThen PermissionAction[AuthRequest](ReviewFlags)
 
@@ -249,13 +251,18 @@ final class Application @Inject()(data: DataHelper,
     */
   def setFlagResolved(flagId: Int, resolved: Boolean): Action[AnyContent] = FlagAction.async { implicit request =>
     this.service.access[Flag](classOf[Flag]).get(flagId).semiFlatMap { flag =>
-      users.current.value.map { user =>
-        flag.setResolved(resolved, user)
-        flag.user.map { flagCreater =>
-          UserActionLogger.log(request, LoggedAction.ProjectFlagResolved, flag.projectId, s"Flag Resolved by ${user.fold("unknown")(_.name)}", s"Flagged by ${flagCreater.name}")
-        }
-        Ok
-      }
+      for {
+        user        <- users.current.value
+        _           <- flag.markResolved(resolved, user)
+        flagCreator <- flag.user
+        _           <- UserActionLogger.log(
+          request,
+          LoggedAction.ProjectFlagResolved,
+          flag.projectId,
+          s"Flag Resolved by ${user.fold("unknown")(_.name)}",
+          s"Flagged by ${flagCreator.name}"
+        )
+      } yield Ok
     }.getOrElse(NotFound)
   }
 
@@ -319,7 +326,7 @@ final class Application @Inject()(data: DataHelper,
     * Show the activities page for a user
     */
   def showActivities(user: String): Action[AnyContent] = (Authenticated andThen PermissionAction[AuthRequest](ReviewProjects)) async { implicit request =>
-    this.users.withName(user).semiFlatMap { u =>
+    users.withName(user).semiFlatMap { u =>
       val activities: Future[Seq[(Object, Option[Project])]] = u.id match {
         case None => Future.successful(Seq.empty)
         case Some(id) =>
@@ -327,12 +334,12 @@ final class Application @Inject()(data: DataHelper,
             .filter(_.userId === id)
             .map(_.take(20).map { review => review ->
               this.service.access[Version](classOf[Version]).filter(_.id === review.versionId).flatMap { version =>
-                this.projects.find(_.id === version.head.projectId).value
+                projects.find(_.id === version.head.projectId).value
               }
             })
           val flags = this.service.access[Flag](classOf[Flag])
             .filter(_.resolvedBy === id)
-            .map(_.take(20).map(flag => flag -> this.projects.find(_.id === flag.projectId).value))
+            .map(_.take(20).map(flag => flag -> projects.find(_.id === flag.projectId).value))
 
           val allActivities = reviews.flatMap(r => flags.map(_ ++ r))
 
@@ -444,9 +451,9 @@ final class Application @Inject()(data: DataHelper,
   def UserAdminAction: ActionBuilder[AuthRequest, AnyContent] = Authenticated andThen PermissionAction[AuthRequest](UserAdmin)
 
   def userAdmin(user: String): Action[AnyContent] = UserAdminAction.async { implicit request =>
-    this.users.withName(user).semiFlatMap { u =>
+    users.withName(user).semiFlatMap { u =>
       for {
-        isOrga <- u.isOrganization
+        isOrga <- u.toMaybeOrganization.isDefined
         (projectRoles, orga) <- {
           if (isOrga)
             (Future.successful(Seq.empty), getOrga(request, user).value).parTupled
@@ -467,56 +474,83 @@ final class Application @Inject()(data: DataHelper,
   }
 
   def updateUser(userName: String): Action[AnyContent] = UserAdminAction.async { implicit request =>
-    this.users.withName(userName).map { user =>
+    users.withName(userName).map { user =>
       bindFormOptionT[Future](this.forms.UserAdminUpdate).flatMap { case (thing, action, data) =>
         import play.api.libs.json._
         val json = Json.parse(data)
 
-        def updateRoleTable[M <: RoleModel](modelAccess: ModelAccess[M], allowedType: Class[_ <: Role], ownerType: RoleTypes.RoleType, transferOwner: M => Future[Int]) = {
+        def updateRoleTable[M <: RoleModel](
+          modelAccess: ModelAccess[M],
+          allowedType: Class[_ <: Role],
+          ownerType: RoleTypes.RoleType,
+          transferOwner: M => Future[M],
+          setRoleType: (M, RoleTypes.RoleType) => Future[M],
+          setAccepted: (M, Boolean) => Future[M]
+        ) = {
           val id = (json \ "id").as[Int]
           action match {
-            case "setRole" => modelAccess.get(id).map { role =>
+            case "setRole" => modelAccess.get(id).semiFlatMap { role =>
               val roleType = RoleTypes.withId((json \ "role").as[Int])
-              if (roleType == ownerType) {
-                transferOwner(role)
-                Ok
-              } else if (roleType.roleClass == allowedType && roleType.isAssignable) {
-                role.setRoleType(roleType)
-                Ok
-              } else BadRequest
+
+              if (roleType == ownerType)
+                transferOwner(role).as(Ok)
+              else if (roleType.roleClass == allowedType && roleType.isAssignable)
+                setRoleType(role, roleType).as(Ok)
+              else
+                Future.successful(BadRequest)
             }
-            case "setAccepted" => modelAccess.get(id).map { role =>
-              role.setAccepted((json \ "accepted").as[Boolean])
-              Ok
-            }
-            case "deleteRole" => modelAccess.get(id).filter(_.roleType.isAssignable).map { role =>
-              role.remove()
-              Ok
-            }
+            case "setAccepted" =>
+              modelAccess
+                .get(id)
+                .semiFlatMap(role => setAccepted(role, (json \ "accepted").as[Boolean]).as(Ok))
+            case "deleteRole" =>
+              modelAccess
+                .get(id)
+                .filter(_.roleType.isAssignable)
+                .semiFlatMap(_.remove().as(Ok))
           }
         }
 
         def transferOrgOwner(r: OrganizationRole) = {
-          r.organization.flatMap { orga =>
-            orga.transferOwner(orga.memberships.newMember(r.userId))
-          }
+          r.organization
+            .flatMap(orga => orga.transferOwner(orga.memberships.newMember(r.userId)))
+            .as(r)
         }
 
-        val isOrga = OptionT.liftF(user.isOrganization)
+        val isOrga = OptionT.liftF(user.toMaybeOrganization.isDefined)
         thing match {
           case "orgRole" =>
-            isOrga.filterNot(identity).flatMap { _ =>
-              updateRoleTable(user.organizationRoles, classOf[OrganizationRole], RoleTypes.OrganizationOwner, transferOrgOwner)
+            OptionT.liftF(user.toMaybeOrganization.isEmpty).filter(identity).flatMap { _ =>
+              updateRoleTable[OrganizationRole](
+                user.organizationRoles,
+                classOf[OrganizationRole],
+                RoleTypes.OrganizationOwner,
+                transferOrgOwner,
+                (r, tpe) => user.organizationRoles.update(r.copy(roleType = tpe)),
+                (r, accepted) => user.organizationRoles.update(r.copy(isAccepted = accepted))
+              )
             }
           case "memberRole" =>
-            isOrga.filter(identity).flatMap { _ =>
-              OptionT.liftF(user.toOrganization).flatMap { orga =>
-                updateRoleTable(orga.memberships.roles, classOf[OrganizationRole], RoleTypes.OrganizationOwner, transferOrgOwner)
-              }
+            user.toMaybeOrganization.flatMap { orga =>
+              updateRoleTable[OrganizationRole](
+                orga.memberships.roles,
+                classOf[OrganizationRole],
+                RoleTypes.OrganizationOwner,
+                transferOrgOwner,
+                (r, tpe) => orga.memberships.roles.update(r.copy(roleType = tpe)),
+                (r, accepted) => orga.memberships.roles.update(r.copy(isAccepted = accepted))
+              )
             }
           case "projectRole" =>
-            isOrga.filterNot(identity).flatMap { _ =>
-              updateRoleTable(user.projectRoles, classOf[ProjectRole], RoleTypes.ProjectOwner, (r: ProjectRole) => r.project.flatMap(p => p.transferOwner(p.memberships.newMember(r.userId))))
+            OptionT.liftF(user.toMaybeOrganization.isEmpty).filter(identity).flatMap { _ =>
+              updateRoleTable[ProjectRole](
+                user.projectRoles,
+                classOf[ProjectRole],
+                RoleTypes.ProjectOwner,
+                r => r.project.flatMap(p => p.transferOwner(p.memberships.newMember(r.userId))).as(r),
+                (r, tpe) => user.projectRoles.update(r.copy(roleType = tpe)),
+                (r, accepted) => user.projectRoles.update(r.copy(isAccepted = accepted))
+              )
             }
           case _ => OptionT.none[Future, Status]
         }

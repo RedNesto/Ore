@@ -16,21 +16,22 @@ import com.vladsch.flexmark.html.renderer._
 import com.vladsch.flexmark.html.{HtmlRenderer, LinkResolver, LinkResolverFactory}
 import com.vladsch.flexmark.parser.Parser
 import com.vladsch.flexmark.util.options.MutableDataSet
+
 import db.access.ModelAccess
 import db.impl.OrePostgresDriver.api._
 import db.impl.PageTable
-import db.impl.model.OreModel
 import db.impl.schema.PageSchema
-import db.impl.table.ModelKeys._
-import db.{ModelFilter, Named}
+import db.{Model, ModelFilter, ModelService, Named}
 import ore.OreConfig
 import ore.permission.scope.ProjectScope
 import play.twirl.api.Html
 import util.StringUtils._
 import util.instances.future._
 import util.functional.OptionT
-
 import scala.concurrent.{ExecutionContext, Future}
+
+import db.impl.access.ProjectBase
+import discourse.OreDiscourseApi
 
 /**
   * Represents a documentation page within a project.
@@ -41,18 +42,18 @@ import scala.concurrent.{ExecutionContext, Future}
   * @param parentId     The parent page ID, -1 if none
   * @param name         Page name
   * @param slug         Page URL slug
-  * @param _contents    Markdown contents
+  * @param contents    Markdown contents
   * @param isDeletable  True if can be deleted by the user
   */
-case class Page(override val id: Option[Int] = None,
-                override val createdAt: Option[Timestamp] = None,
-                override val projectId: Int = -1,
+case class Page(id: Option[Int] = None,
+                createdAt: Option[Timestamp] = None,
+                projectId: Int = -1,
                 parentId: Int = -1,
-                override val name: String,
+                name: String,
                 slug: String,
                 isDeletable: Boolean = true,
-                private var _contents: String)
-                extends OreModel(id, createdAt)
+                contents: String)
+                extends Model
                   with ProjectScope
                   with Named {
 
@@ -65,40 +66,31 @@ case class Page(override val id: Option[Int] = None,
   checkNotNull(this.projectId != -1, "invalid project id", "")
   checkNotNull(this.name, "name cannot be null", "")
   checkNotNull(this.slug, "slug cannot be null", "")
-  checkNotNull(this._contents, "contents cannot be null", "")
+  checkNotNull(this.contents, "contents cannot be null", "")
 
   def this(projectId: Int, name: String, content: String, isDeletable: Boolean, parentId: Int) = {
-    this(projectId=projectId, name=compact(name), slug=slugify(name),
-      _contents=content.trim, isDeletable=isDeletable, parentId = parentId)
+    this(projectId = projectId, name = compact(name), slug = slugify(name),
+      contents = content.trim, isDeletable = isDeletable, parentId = parentId)
   }
-
-  /**
-    * Returns the Markdown contents of this Page.
-    *
-    * @return Markdown contents
-    */
-  def contents: String = this._contents
 
   /**
     * Sets the Markdown contents of this Page and updates the associated forum
     * topic if this is the home page.
     *
-    * @param _contents Markdown contents
+    * @param contents Markdown contents
     */
-  def setContents(_contents: String)(implicit ec: ExecutionContext): Future[Page] = {
-    checkNotNull(_contents, "null contents", "")
-    checkArgument((this.isHome && _contents.length <= MaxLength) || _contents.length <= MaxLengthPage, "contents too long", "")
-    this._contents = _contents
-    if (!isDefined) Future.successful(this)
+  def updateContentsWithForum(contents: String)(implicit ec: ExecutionContext, service: ModelService, config: OreConfig, forums: OreDiscourseApi): Future[Page] = {
+    checkNotNull(contents, "null contents", "")
+    checkArgument((this.isHome && contents.length <= maxLength) || contents.length <= maxLengthPage, "contents too long", "")
+    val newPage = copy(contents = contents)
+    if (!isDefined) Future.successful(newPage)
     else {
       for {
-        _ <- update(Contents)
+        updated <- service.update(newPage)
         project <- this.project
         // Contents were updated, update on forums
-        _ <- if (this.name.equals(HomeName) && project.topicId != -1) this.forums.updateProjectTopic(project) else Future.successful(false)
-      } yield {
-        this
-      }
+        _ <- if (this.name.equals(homeName) && project.topicId != -1) forums.updateProjectTopic(project) else Future.successful(false)
+      } yield updated
     }
   }
 
@@ -107,27 +99,23 @@ case class Page(override val id: Option[Int] = None,
     *
     * @return HTML representation
     */
-  def html(project: Option[Project]): Html = RenderPage(this, project)
+  def html(project: Option[Project])(implicit config: OreConfig): Html = renderPage(this, project)
 
   /**
     * Returns true if this is the home page.
     *
     * @return True if home page
     */
-  def isHome: Boolean = this.name.equals(HomeName) && parentId == -1
+  def isHome(implicit config: OreConfig): Boolean = this.name.equals(homeName) && parentId == -1
 
   /**
     * Get Project associated with page.
     *
     * @return Optional Project
     */
-  def parentProject(implicit ec: ExecutionContext): OptionT[Future, Project] = this.projectBase.get(projectId)
+  def parentProject(implicit ec: ExecutionContext, projectBase: ProjectBase): OptionT[Future, Project] = projectBase.get(projectId)
 
-  /**
-    *
-    * @return
-    */
-  def parentPage(implicit ec: ExecutionContext): OptionT[Future, Page] = {
+  def parentPage(implicit ec: ExecutionContext, service: ModelService): OptionT[Future, Page] = {
     parentProject.flatMap(_.pages.find(ModelFilter[Page](_.id === parentId).fn))
   }
 
@@ -143,8 +131,8 @@ case class Page(override val id: Option[Int] = None,
     *
     * @return Page's children
     */
-  def children: ModelAccess[Page]
-  = this.service.access[Page](classOf[Page], ModelFilter[Page](_.parentId === this.id.get))
+  def children(implicit service: ModelService): ModelAccess[Page]
+  = service.access[Page](classOf[Page], ModelFilter[Page](_.parentId === this.id.get))
 
   def url(implicit project: Project, parentPage: Option[Page]) : String = project.url + "/pages/" + this.fullSlug(parentPage)
   override def copyWith(id: Option[Int], theTime: Option[Timestamp]): Page = this.copy(id = id, createdAt = theTime)
@@ -188,7 +176,7 @@ object Page {
           }
         } else {
           val trustedUrlHosts = this.config.app.get[Seq[String]]("trustedUrlHosts")
-          val checkSubdomain = (trusted: String) => trusted(0) == '.' && (host.endsWith(trusted) || host == trusted.substring(1));
+          val checkSubdomain = (trusted: String) => trusted(0) == '.' && (host.endsWith(trusted) || host == trusted.substring(1))
           if (host == null || trustedUrlHosts.exists(trusted => trusted == host || checkSubdomain(trusted))) {
             urlString
           } else {
@@ -230,14 +218,14 @@ object Page {
       .build())
   }
 
-  def Render(markdown: String)(implicit config: OreConfig): Html = {
+  def render(markdown: String)(implicit config: OreConfig): Html = {
     // htmlRenderer is lazy loaded so linkResolver will exist upon loading
     if (linkResolver.isEmpty)
       linkResolver = Some(new ExternalLinkResolver.Factory(config))
     Html(htmlRenderer.render(markdownParser.parse(markdown)))
   }
 
-  def RenderPage(page: Page, project: Option[Project])(implicit config: OreConfig): Html = {
+  def renderPage(page: Page, project: Option[Project])(implicit config: OreConfig): Html = {
     if (linkResolver.isEmpty)
       linkResolver = Some(new ExternalLinkResolver.Factory(config))
 
@@ -246,33 +234,33 @@ object Page {
     if (project.isDefined)
       options.set[String](WikiLinkExtension.LINK_PREFIX, s"/${project.get.ownerName}/${project.get.slug}/pages/")
 
-    Html(htmlRenderer.withOptions(options).render(markdownParser.parse(page._contents)))
+    Html(htmlRenderer.withOptions(options).render(markdownParser.parse(page.contents)))
   }
 
   /**
     * The name of each Project's homepage.
     */
-  def HomeName(implicit config: OreConfig): String = config.pages.get[String]("home.name")
+  def homeName(implicit config: OreConfig): String = config.pages.get[String]("home.name")
 
   /**
     * The template body for the Home page.
     */
-  def HomeMessage(implicit config: OreConfig): String = config.pages.get[String]("home.message")
+  def homeMessage(implicit config: OreConfig): String = config.pages.get[String]("home.message")
 
   /**
     * The minimum amount of characters a page may have.
     */
-  def MinLength(implicit config: OreConfig): Int = config.pages.get[Int]("min-len")
+  def minLength(implicit config: OreConfig): Int = config.pages.get[Int]("min-len")
 
   /**
     * The maximum amount of characters the home page may have.
     */
-  def MaxLength(implicit config: OreConfig): Int = config.pages.get[Int]("max-len")
+  def maxLength(implicit config: OreConfig): Int = config.pages.get[Int]("max-len")
 
   /**
     * The maximum amount of characters a page may have.
     */
-  def MaxLengthPage(implicit config: OreConfig): Int = config.pages.get[Int]("page.max-len")
+  def maxLengthPage(implicit config: OreConfig): Int = config.pages.get[Int]("page.max-len")
 
   /**
     * Returns a template for new Pages.
@@ -281,6 +269,6 @@ object Page {
     * @param body   Default message
     * @return       Template
     */
-  def Template(title: String, body: String = ""): String = "# " + title + "\n" + body
+  def template(title: String, body: String = ""): String = "# " + title + "\n" + body
 
 }

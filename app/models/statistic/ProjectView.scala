@@ -4,6 +4,7 @@ import java.sql.Timestamp
 
 import com.github.tminglei.slickpg.InetString
 import com.google.common.base.Preconditions._
+
 import controllers.sugar.Requests.ProjectRequest
 import db.impl.ProjectViewsTable
 import db.impl.access.UserBase
@@ -11,10 +12,10 @@ import models.project.Project
 import ore.StatTracker._
 import ore.permission.scope.ProjectScope
 import util.instances.future._
-
 import scala.concurrent.{ExecutionContext, Future}
 
 import controllers.sugar.Requests
+import security.spauth.SpongeAuthApi
 
 /**
   * Represents a unique view on a Project.
@@ -26,14 +27,13 @@ import controllers.sugar.Requests
   * @param cookie     Browser cookie
   * @param userId     User ID
   */
-case class ProjectView(override val id: Option[Int] = None,
-                       override val createdAt: Option[Timestamp] = None,
-                       override val modelId: Int,
-                       override val address: InetString,
-                       override val cookie: String,
-                       private var _userId: Option[Int] = None)
-                       extends StatEntry[Project](id, createdAt, modelId, address, cookie, _userId)
-                         with ProjectScope {
+case class ProjectView(id: Option[Int] = None,
+                       createdAt: Option[Timestamp] = None,
+                       modelId: Int,
+                       address: InetString,
+                       cookie: String,
+                       userId: Option[Int] = None)
+                       extends StatEntry[Project] with ProjectScope {
 
   override type M = ProjectView
   override type T = ProjectViewsTable
@@ -52,19 +52,18 @@ object ProjectView {
     * @param request  Request to bind
     * @return         New ProjectView
     */
-  def bindFromRequest(request: ProjectRequest[_])(implicit ec: ExecutionContext, users: UserBase): Future[ProjectView] = {
+  def bindFromRequest(request: ProjectRequest[_])(implicit ec: ExecutionContext, users: UserBase, auth: SpongeAuthApi): Future[ProjectView] = {
     implicit val r: Requests.OreRequest[_] = request.request
     checkNotNull(request, "null request", "")
     checkNotNull(users, "null user base", "")
     users.current.subflatMap(_.id).value.map { userId =>
-      val view = ProjectView(
+      ProjectView(
         modelId = request.data.project.id.get,
         address = InetString(remoteAddress),
         cookie = currentCookie,
-        _userId = userId
+        userId = userId
       )
-      view.userBase = users
-      view
+
     }
   }
 

@@ -7,8 +7,9 @@ import models.user.role.ProjectRole
 import ore.project.io.PluginFile
 import ore.{Cacheable, OreConfig}
 import play.api.cache.SyncCacheApi
-
 import scala.concurrent.{ExecutionContext, Future}
+
+import discourse.OreDiscourseApi
 
 /**
   * Represents a Project with an uploaded plugin that has not yet been
@@ -31,7 +32,7 @@ case class PendingProject(projects: ProjectBase,
   /**
     * The [[Project]]'s internal settings.
     */
-  val settings: ProjectSettings = this.service.processor.process(ProjectSettings())
+  val settings: ProjectSettings = ProjectSettings()
 
   /**
     * The first [[PendingVersion]] for this PendingProject.
@@ -51,11 +52,11 @@ case class PendingProject(projects: ProjectBase,
         this.pendingVersion.project = newProject
         this.factory.createVersion(this.pendingVersion)
       }
-      _ <- newProject.setRecommendedVersion(newVersion._1)
-    } yield (newProject, newVersion._1)
+      updatedProject <- service.update(newProject.copy(recommendedVersionId = Some(newVersion._1.id.get)))
+    } yield (updatedProject, newVersion._1)
   }
 
-  def cancel()(implicit ec: ExecutionContext) = {
+  def cancel()(implicit ec: ExecutionContext, forums: OreDiscourseApi) = {
     free()
     this.file.delete()
     if (this.underlying.isDefined)

@@ -2,8 +2,8 @@ package models.api
 
 import java.sql.Timestamp
 
+import db.Model
 import db.impl.ProjectApiKeyTable
-import db.impl.model.OreModel
 import ore.project.ProjectOwned
 import ore.rest.ProjectApiKeyTypes.ProjectApiKeyType
 
@@ -12,7 +12,7 @@ case class ProjectApiKey(override val id: Option[Int] = None,
                          override val projectId: Int,
                          keyType: ProjectApiKeyType,
                          value: String)
-                         extends OreModel(id, createdAt) with ProjectOwned {
+                         extends Model with ProjectOwned {
 
   override type T = ProjectApiKeyTable
   override type M = ProjectApiKey
