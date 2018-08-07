@@ -22,7 +22,7 @@ this.
 
         <link rel="icon" href="@config.sponge.get[String]("icon")">
         <link rel="stylesheet" type="text/css" href="@routes.Assets.at("highlight/styles/default.css")" />
-        <link rel="stylesheet" type="text/css" href="@routes.Assets.at("bootstrap/css/bootstrap.min.css")" />
+        <link rel="stylesheet" type="text/css" href="@routes.Assets.at("lib/bootstrap/dist/css/bootstrap.min.css")" />
         <link rel="stylesheet" type="text/css" href="@routes.Assets.at("stylesheets/main.css")" />
 
         <!-- See https://goo.gl/OOhYW5 -->
@@ -50,7 +50,8 @@ this.
 
         @if(scripts) {
             <script type="text/javascript" src="@routes.Assets.at("lib/moment/min/moment.min.js")"></script>
-            <script type="text/javascript" src="@routes.Assets.at("bootstrap/js/bootstrap.min.js")"></script>
+            <script type="text/javascript" src="@routes.Assets.at("lib/popper.js/dist/umd/popper.min.js")"></script>
+            <script type="text/javascript" src="@routes.Assets.at("lib/bootstrap/dist/js/bootstrap.min.js")"></script>
             <script type="text/javascript" src="@routes.Assets.at("lib/filesize/lib/filesize.js")"></script>
             <script type="text/javascript" src="@routes.Assets.at("lib/clipboard/dist/clipboard.min.js")"></script>
             <script type="text/javascript" src="@routes.Assets.at("highlight/highlight.pack.js")"></script>
