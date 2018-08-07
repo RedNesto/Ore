@@ -7,16 +7,28 @@
     border-radius: 0;
     padding-top: 9px;
     padding-bottom: 9px;
+
+    a {
+      color: white;
+    }
   }
 
   > .list-group {
-    &:last-child .list-group-item:last-child {
+    &:last-child .list-group-item:last-child, .list-group-item:first-child {
       border-radius: 0;
     }
 
     .list-group-item {
       padding-top: 8px;
       padding-bottom: 8px;
+      color: $sponge_dark_grey;
+
+      &.active {
+        background: white;
+        border-color: rgba(0,0,0,.125);
+        box-shadow: inset -10px 0px 0px 0px $sponge_yellow;
+        border-right-color: $sponge_yellow;
+      }
     }
   }
 }
