@@ -75,18 +75,19 @@ sorted according to different criteria.
 }
 
 @bootstrap.layout(messages("general.title"), scripts) {
-    <div class="row centered-content-row">
-        <div class="col-md-9 ore-banner">
-            <div class="row aligned-row">
-                <div class="col-xs-2 ore-logo">
-                    <img src="@routes.Assets.at("images/ore-colored.svg")" />
+    <div class="row">
+        <div class="col-md-9">
+            <div class="row banner align-items-center no-gutters">
+                <div class="col-auto">
+                    <img src="@routes.Assets.at("images/ore-colored.svg")" class="img-fluid" />
                 </div>
-                <div class="col-xs-10 text">
+                <div class="col ml-3">
                     <div class="headline">Ore</div>
                     <div>A Minecraft package repository</div>
                 </div>
             </div>
         </div>
+
         <div class="col-md-3 sponsor">
             <div class="panel sponsor-panel">
                 <span>Sponsored by</span>
