@@ -255,7 +255,8 @@ filters {
             ]
             img-src = [
                 "self",
-                "https:"
+                "https:",
+                "data:"
             ]
             font-src = [
                 "self"

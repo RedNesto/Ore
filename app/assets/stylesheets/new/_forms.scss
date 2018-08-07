@@ -1,0 +1,20 @@
+.custom-select {
+  border-radius: 0;
+
+  &:hover, &:focus {
+    box-shadow: none;
+    border-color: $gray-focus;
+  }
+}
+
+.input-group {
+  input.form-control, button {
+    border-radius: 0;
+  }
+
+  input.form-control {
+    &:focus, &:hover {
+      border-color: $gray-focus;
+    }
+  }
+}

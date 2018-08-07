@@ -1,0 +1,22 @@
+.card {
+  border-radius: 0;
+
+  > .card-header {
+    background: $sponge_dark_grey;
+    color: white;
+    border-radius: 0;
+    padding-top: 9px;
+    padding-bottom: 9px;
+  }
+
+  > .list-group {
+    &:last-child .list-group-item:last-child {
+      border-radius: 0;
+    }
+
+    .list-group-item {
+      padding-top: 8px;
+      padding-bottom: 8px;
+    }
+  }
+}

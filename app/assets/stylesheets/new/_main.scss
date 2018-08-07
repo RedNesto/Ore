@@ -1,15 +1,10 @@
+@import "variables";
+@import "buttons";
+@import "forms";
+@import "cards";
+
+@import "pages/home";
+
 .site-content > .container {
-  margin-top: 5.625em;
-}
-
-.banner {
-  img {
-    height: 4em;
-    width: 4em;
-  }
-
-  .headline {
-    font-weight: 800;
-    font-size: 1.75em;
-  }
+  margin-top: 5em;
 }
