@@ -1,3 +1,15 @@
 .site-content > .container {
   margin-top: 5.625em;
 }
+
+.banner {
+  img {
+    height: 4em;
+    width: 4em;
+  }
+
+  .headline {
+    font-weight: 800;
+    font-size: 1.75em;
+  }
+}
