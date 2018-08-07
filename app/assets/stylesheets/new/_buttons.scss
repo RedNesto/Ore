@@ -1,0 +1,9 @@
+.btn-yellow {
+  background: $sponge_yellow;
+  border-color: darken($sponge_yellow, 5);
+
+  &:hover {
+    background: darken($sponge_yellow, 3);
+    border-color: darken($sponge_yellow, 9);
+  }
+}

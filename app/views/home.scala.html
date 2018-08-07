@@ -75,7 +75,7 @@ sorted according to different criteria.
 }
 
 @bootstrap.layout(messages("general.title"), scripts) {
-    <div class="row">
+    <div class="row mb-3 align-items-center">
         <div class="col-md-9">
             <div class="row banner align-items-center no-gutters">
                 <div class="col-auto">
@@ -88,29 +88,22 @@ sorted according to different criteria.
             </div>
         </div>
 
-        <div class="col-md-3 sponsor">
-            <div class="panel sponsor-panel">
-                <span>Sponsored by</span>
-                <div class="panel-body">
-                @defining(randomSponsor) { sponsor =>
-                    <a href="@sponsor._3">
-                        <img class="logo" src="@routes.Assets.at(sponsor._2)" />
-                    </a>
-                }
-                </div>
-            </div>
+        <div class="col-md-3 sponsor text-center">
+        @defining(randomSponsor) { sponsor =>
+            <a href="@sponsor._3">
+                <img class="logo img-fluid" src="@routes.Assets.at(sponsor._2)" />
+            </a>
+        }
         </div>
     </div>
 
-        <!-- Main content -->
-    <div class="row project-content">
-            <!-- Project table -->
+    <div class="row">
         <div class="col-md-9">
-            <div class="project-search input-group">
-                <input type="text" class="form-control" placeholder="Search in projects...">
-                <span class="input-group-btn">
-                    <button class="btn yellow" type="button">Search</button>
-                </span>
+            <div class="input-group mb-3">
+                <input type="text" class="form-control" placeholder="Search in projects..." aria-label="Search query" aria-describedby="search-button-addon">
+                <div class="input-group-append">
+                    <button class="btn btn-yellow" type="button" id="search-button-addon">Search</button>
+                </div>
             </div>
 
             @if(query.isDefined) {
@@ -130,40 +123,30 @@ sorted according to different criteria.
             )
         </div>
 
-            <!-- Sidebar -->
         <div class="col-md-3">
-                <!-- Ordering selection -->
-            <select class="form-control select-sort">
+            <select class="custom-select mb-3">
                 <option selected value="@sort.id">@sort.title</option>
                 @values.filterNot(_.equals(sort)).map { strategy =>
                     <option value="@strategy.id">@strategy.title</option>
                 }
             </select>
-
-                <!-- Category table -->
-            <div class="panel panel-default">
-                <div class="panel-heading">
-                    <h3 class="panel-title">@messages("project.category.plural")</h3>
+            <div class="card categories">
+                <div class="card-header">
+                    @messages("project.category.plural")
                     @if(visibleCategories.isDefined) {
                         <a href="@routes.Application.showHome(None, None, None, None, None)">
                             <i class="category-reset fa fa-times"></i>
                         </a>
                     }
                 </div>
-
-                <table class="table panel-body category-table">
-                    <tbody>
+                <div class="list-group">
                     @for(category <- Categories.visible) {
-                        <tr data-id="@category.id" @if(visibleCategories.isDefined && visibleCategories.get.contains(category)) {
-                            class="selected"} >
-                            <td><i class="fa @category.icon"></i></td>
-                            <td>
-                                <strong>@category.title</strong>
-                            </td>
-                        </tr>
+                        <a class="list-group-item list-group-item-action @if(visibleCategories.isDefined && visibleCategories.get.contains(category)) { selected }" href="#">
+                            <i class="fa @category.icon"></i>
+                            @category.title
+                        </a>
                     }
-                    </tbody>
-                </table>
+                </div>
             </div>
         </div>
     </div>
