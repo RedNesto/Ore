@@ -2,7 +2,7 @@
 @import db.ModelService
 @import ore.OreConfig
 @import play.twirl.api.Html
-@(title: String, step: Int)(content: Html)(implicit messages: Messages, request: OreRequest[_], config: OreConfig)
+@(title: String, step: Int)(content: Html)(implicit messages: Messages, request: OreRequest[_], config: OreConfig, flash: Flash)
 
 @bootstrap.layout(title) {
 

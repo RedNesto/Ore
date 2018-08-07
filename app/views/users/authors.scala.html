@@ -6,7 +6,7 @@
 @import security.NonceFilter._
 @import util.StringUtils._
 @import views.html.utils.userAvatar
-@(authors: Seq[(User, Int)], ordering: String, page: Int)(implicit messages: Messages, request: OreRequest[_], config: OreConfig)
+@(authors: Seq[(User, Int)], ordering: String, page: Int)(implicit messages: Messages, request: OreRequest[_], config: OreConfig, flash: Flash)
 
 @pageSize = @{ config.users.get[Int]("author-page-size") }
 @direction = @{ if (ordering.startsWith("-")) "o-chevron-down" else "o-chevron-up" }

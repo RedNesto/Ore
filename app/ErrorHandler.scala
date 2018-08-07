@@ -29,6 +29,7 @@ class ErrorHandler @Inject()(env: Environment,
     implicit val session: Session = request.session
     implicit val requestImpl: RequestHeader = request
     implicit val headerData: HeaderData = HeaderData() // Empty HeaderData on error
+    implicit val flash: Flash = request.flash
 
     Future.successful {
       if (exception.cause.isInstanceOf[TimeoutException])
@@ -42,6 +43,7 @@ class ErrorHandler @Inject()(env: Environment,
     implicit val session: Session = request.session
     implicit val requestImpl: RequestHeader = request
     implicit val headerData: HeaderData = HeaderData() // Empty HeaderData on error
+    implicit val flash: Flash = request.flash
 
     Future.successful(NotFound(views.html.errors.notFound()))
   }
