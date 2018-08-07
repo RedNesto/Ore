@@ -7,6 +7,7 @@ import javax.inject.Inject
 import models.user.User
 import ore.OreConfig
 import play.api.i18n.{I18nSupport, Lang, MessagesApi}
+import play.api.mvc.Flash
 
 final class EmailFactory @Inject()(override val messagesApi: MessagesApi,
                                    implicit val config: OreConfig,
@@ -18,6 +19,8 @@ final class EmailFactory @Inject()(override val messagesApi: MessagesApi,
   implicit val users: UserBase = this.service.getModelBase(classOf[UserBase])
   def create(user: User, id: String)(implicit request: OreRequest[_]): Email = {
     import user.langOrDefault
+    implicit val flash: Flash = request.flash
+
     Email(
       recipient = user.email.get,
       subject = this.messagesApi(s"$id.subject"),

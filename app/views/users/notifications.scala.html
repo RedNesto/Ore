@@ -8,7 +8,7 @@
 @import ore.user.notification.{InviteFilters, NotificationFilters}
 @import views.html.utils.userAvatar
 @(notifications: Seq[(Notification, User)], invites: Seq[(RoleModel, Visitable)], notificationFilter: NotificationFilter,
-        inviteFilter: InviteFilter)(implicit messages: Messages, request: OreRequest[_], config: OreConfig)
+        inviteFilter: InviteFilter)(implicit messages: Messages, request: OreRequest[_], config: OreConfig, flash: Flash)
 
 @notificationFilterOption(option: NotificationFilter) = @{
     if (option.equals(notificationFilter)) {

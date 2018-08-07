@@ -20,7 +20,9 @@ sorted according to different criteria.
         sort: ProjectSortingStrategy, platform: Option[Platform])(implicit messages: Messages, flash: Flash,
         request: OreRequest[_], config: OreConfig)
 
-@projectRoutes = @{controllers.project.routes.Projects}
+@projectRoutes = @{
+    controllers.project.routes.Projects
+}
 
 @randomSponsor = @{
     val logos: Seq[Configuration] = config.sponge.get[Seq[Configuration]]("sponsors")
@@ -48,16 +50,16 @@ sorted according to different criteria.
 
 @maybeActive(pform: Platform) = @{
     platform.map { p =>
-        if (p.equals(pform))
+        if(p.equals(pform))
             "active"
         else
             ""
     }
 }
 
-@bootstrap.layout(messages("general.title")) {
-
+@scripts = {
     <script type="text/javascript" src="@routes.Assets.at("javascripts/home.js")"></script>
+
     <script nonce="@nonce">
     @if(visibleCategories.isDefined) {
     CATEGORY_STRING = "@visibleCategories.get.map(_.id).mkString(",")";
@@ -70,139 +72,97 @@ sorted according to different criteria.
     }
     currentlyLoaded = @models.size;
     </script>
+}
 
-    <div class="container" style="margin-top: 63px; padding-top: 1.5rem">
-
-        <!-- Header -->
-        <div class="index-header">
-            <div class="row">
-                <div class="col-md-12">
-                    @alert("success")
-                    @alert("error")
+@bootstrap.layout(messages("general.title"), scripts) {
+    <div class="row centered-content-row">
+        <div class="col-md-9 ore-banner">
+            <div class="row aligned-row">
+                <div class="col-xs-2 ore-logo">
+                    <img src="@routes.Assets.at("images/ore-colored.svg")" />
                 </div>
-            </div>
-
-            <div class="row centered-content-row">
-                <div class="col-md-9 ore-banner">
-                        <div class="row aligned-row">
-                            <div class="col-xs-2 ore-logo">
-                                <img src="@routes.Assets.at("images/ore-colored.svg")" />
-                            </div>
-                            <div class="col-xs-10 text">
-                                <div class="headline">Ore</div>
-                                <div>A Minecraft package repository</div>
-                            </div>
-                        </div>
-                </div>
-                <div class="col-md-3 sponsor">
-                    <div class="panel sponsor-panel">
-                        <span>Sponsored by</span>
-                        <div class="panel-body">
-                            @defining(randomSponsor) { sponsor =>
-                                <a href="@sponsor._3">
-                                    <img class="logo" src="@routes.Assets.at(sponsor._2)" />
-                                </a>
-                            }
-                        </div>
-                    </div>
+                <div class="col-xs-10 text">
+                    <div class="headline">Ore</div>
+                    <div>A Minecraft package repository</div>
                 </div>
             </div>
         </div>
+        <div class="col-md-3 sponsor">
+            <div class="panel sponsor-panel">
+                <span>Sponsored by</span>
+                <div class="panel-body">
+                @defining(randomSponsor) { sponsor =>
+                    <a href="@sponsor._3">
+                        <img class="logo" src="@routes.Assets.at(sponsor._2)" />
+                    </a>
+                }
+                </div>
+            </div>
+        </div>
+    </div>
 
         <!-- Main content -->
-        <div class="row project-content">
-                <!-- Project table -->
-            <div class="col-md-9">
-                <div class="project-search input-group">
-                    <input type="text" class="form-control" placeholder="Search in projects...">
-                    <span class="input-group-btn">
-                        <button class="btn yellow" type="button">Search</button>
-                    </span>
-                </div>
-
-                @if(query.isDefined) {
-                    <li class="list-group-item minor search-header">
-                        <span class="pull-left">Showing results for: <i>@query</i></span>
-                        <i class="fa fa-times pull-right dismiss"></i>
-                        <div class="clearfix"></div>
-                    </li>
-                }
-
-                @projects.list(
-                    models = models,
-                    page = page,
-                    pageSize = config.projects.get[Int]("init-load"),
-                    call = page => routes.Application.showHome(
-                        categoryString, query, orderingOption, Some(page), platformOption)
-                )
+    <div class="row project-content">
+            <!-- Project table -->
+        <div class="col-md-9">
+            <div class="project-search input-group">
+                <input type="text" class="form-control" placeholder="Search in projects...">
+                <span class="input-group-btn">
+                    <button class="btn yellow" type="button">Search</button>
+                </span>
             </div>
 
+            @if(query.isDefined) {
+                <li class="list-group-item minor search-header">
+                    <span class="pull-left">Showing results for: <i>@query</i></span>
+                    <i class="fa fa-times pull-right dismiss"></i>
+                    <div class="clearfix"></div>
+                </li>
+            }
+
+            @projects.list(
+                models = models,
+                page = page,
+                pageSize = config.projects.get[Int]("init-load"),
+                call = page => routes.Application.showHome(
+                    categoryString, query, orderingOption, Some(page), platformOption)
+            )
+        </div>
+
             <!-- Sidebar -->
-            <div class="col-md-3">
-                    <!-- Ordering selection -->
-                <select class="form-control select-sort">
-                    <option selected value="@sort.id">@sort.title</option>
-                    @values.filterNot(_.equals(sort)).map { strategy =>
-                        <option value="@strategy.id">@strategy.title</option>
-                    }
-                </select>
+        <div class="col-md-3">
+                <!-- Ordering selection -->
+            <select class="form-control select-sort">
+                <option selected value="@sort.id">@sort.title</option>
+                @values.filterNot(_.equals(sort)).map { strategy =>
+                    <option value="@strategy.id">@strategy.title</option>
+                }
+            </select>
 
                 <!-- Category table -->
-                <div class="panel panel-default">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">@messages("project.category.plural")</h3>
-                        @if(visibleCategories.isDefined) {
-                            <a href="@routes.Application.showHome(None, None, None, None, None)">
-                                <i class="category-reset fa fa-times"></i>
-                            </a>
-                        }
-                    </div>
-
-                    <table class="table panel-body category-table">
-                        <tbody>
-                        @for(category <- Categories.visible) {
-                            <tr data-id="@category.id" @if(visibleCategories.isDefined && visibleCategories.get.contains(category)) { class="selected"} >
-                                <td><i class="fa @category.icon"></i></td>
-                                <td>
-                                    <strong>@category.title</strong>
-                                </td>
-                            </tr>
-                        }
-                        </tbody>
-                    </table>
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h3 class="panel-title">@messages("project.category.plural")</h3>
+                    @if(visibleCategories.isDefined) {
+                        <a href="@routes.Application.showHome(None, None, None, None, None)">
+                            <i class="category-reset fa fa-times"></i>
+                        </a>
+                    }
                 </div>
 
-                <!-- Platform list -->
-                <!--<div class="panel panel-default">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">@messages("general.platform")</h3>
-                    </div>
-
-                    <ul class="list-group">
-
-                        <a href="@routes.Application.showHome(
-                            categoryString,
-                            query,
-                            orderingOption,
-                            Some(page),
-                            None)"
-                        class="list-group-item @if(platform.isEmpty) { active }">
-                            <strong>@messages("general.any")</strong>
-                        </a>
-
-                        @for(pform <- Platforms.values) {
-                            <a href="@routes.Application.showHome(
-                                categoryString,
-                                query,
-                                orderingOption,
-                                Some(page),
-                                Some(pform.name))"
-                            class="list-group-item @maybeActive(pform)">
-                                <strong>@pform.name</strong>
-                            </a>
-                        }
-                    </ul>
-                </div>-->
+                <table class="table panel-body category-table">
+                    <tbody>
+                    @for(category <- Categories.visible) {
+                        <tr data-id="@category.id" @if(visibleCategories.isDefined && visibleCategories.get.contains(category)) {
+                            class="selected"} >
+                            <td><i class="fa @category.icon"></i></td>
+                            <td>
+                                <strong>@category.title</strong>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>

@@ -6,8 +6,9 @@ this.
 @import ore.OreConfig
 @import play.twirl.api.Html
 @import security.NonceFilter._
-@(title: String, scripts: Boolean = true, header: Boolean = true, user: Boolean = true,
-        footer: Boolean = true)(content: Html)(implicit request: OreRequest[_], messages: Messages, config: OreConfig)
+@import views.html.utils.alert
+@(title: String, scripts: Html = Html(""), scriptsEnabled: Boolean = true, header: Boolean = true, user: Boolean = true,
+        footer: Boolean = true)(content: Html)(implicit request: OreRequest[_], messages: Messages, config: OreConfig, flash: Flash)
 
 <!DOCTYPE html>
 <html>
@@ -15,8 +16,7 @@ this.
         <title>@title</title>
 
         <meta charset="utf-8">
-        <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 
         <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700" rel="stylesheet">
 
@@ -31,7 +31,7 @@ this.
         <!-- See https://goo.gl/qRE0vM -->
         <meta name="theme-color" content="#333">
 
-        @if(scripts) {
+        @if(scriptsEnabled) {
             <script type="text/javascript" src="@routes.Assets.at("lib/jquery/dist/jquery.min.js")"></script>
         }
     </head>
@@ -41,14 +41,23 @@ this.
         }
 
         <div class="site-content">
-            @content
+            <div class="container">
+                <div class="row">
+                     <div class="col">
+                         @alert("success")
+                         @alert("error")
+                     </div>
+                </div>
+
+                @content
+            </div>
         </div>
 
         @if(footer) {
             @bootstrap.footer()
         }
 
-        @if(scripts) {
+        @if(scriptsEnabled) {
             <script type="text/javascript" src="@routes.Assets.at("lib/moment/min/moment.min.js")"></script>
             <script type="text/javascript" src="@routes.Assets.at("lib/popper.js/dist/umd/popper.min.js")"></script>
             <script type="text/javascript" src="@routes.Assets.at("lib/bootstrap/dist/js/bootstrap.min.js")"></script>
@@ -61,6 +70,7 @@ this.
             @if(request != null) {
                 <script nonce="@nonce">csrf = '@play.filters.csrf.CSRF.getToken.get.value'</script>
             }
+            @scripts
         }
 
     </body>
