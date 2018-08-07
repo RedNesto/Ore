@@ -49,6 +49,24 @@ object Categories extends Enumeration {
     }
   }).flatten
 
+  def toQueryString(categories: Seq[Category]) = categories.map(c => c.id).mkString(",")
+
+  def toQueryStringWith(categories: Seq[Category], category: Category) = {
+    var result: Seq[Category] = Seq()
+
+    if(categories.isEmpty || categories.isEmpty) {
+      result = Seq(category)
+    } else {
+      if(categories.contains(category)) {
+        result = (categories.toSet - category).toSeq
+      } else {
+        result = (categories.toSet + category).toSeq
+      }
+    }
+
+    toQueryString(result)
+  }
+
   /**
     * Represents a Project category.
     *

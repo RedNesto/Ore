@@ -124,7 +124,7 @@ sorted according to different criteria.
         </div>
 
         <div class="col-md-3">
-            <select class="custom-select mb-3">
+            <select class="custom-select mb-3 select-sort">
                 <option selected value="@sort.id">@sort.title</option>
                 @values.filterNot(_.equals(sort)).map { strategy =>
                     <option value="@strategy.id">@strategy.title</option>
@@ -141,7 +141,8 @@ sorted according to different criteria.
                 </div>
                 <div class="list-group">
                     @for(category <- Categories.visible) {
-                        <a class="list-group-item list-group-item-action @if(visibleCategories.isDefined && visibleCategories.get.contains(category)) { selected }" href="#">
+                        <a class="list-group-item list-group-item-action @if(visibleCategories.isDefined && visibleCategories.get.contains(category)) { active }"
+                            href="@routes.Application.showHome(Some(Categories.toQueryStringWith(visibleCategories.getOrElse(Seq()), category)), query, Option(sort.id), Option(page), if (platform.isDefined) Some(platform.get.id.toString) else None)">
                             <i class="fa @category.icon"></i>
                             @category.title
                         </a>
