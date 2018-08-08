@@ -129,22 +129,6 @@ $(function() {
         $(this).find('.' + iconClass).removeClass(iconClass).addClass('fa-spinner fa-spin');
     });
 
-    var searchBar = $('.project-search');
-    searchBar.find('input').on('keypress', function(event) {
-        if (event.keyCode === KEY_ENTER) {
-            event.preventDefault();
-            $(this).next().find('.btn').click();
-        }
-    });
-
-    searchBar.find('.btn').click(function() {
-        var query = $(this).closest('.input-group').find('input').val();
-        var url = '/?q=' + query;
-        if (CATEGORY_STRING) url += '&categories=' + CATEGORY_STRING;
-        if (SORT_STRING) url += '&sort=' + SORT_STRING;
-        go(url);
-    });
-
     var body = $('body');
     body.keydown(function(event) {
         var target = $(event.target);
