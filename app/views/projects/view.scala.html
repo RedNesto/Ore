@@ -180,20 +180,20 @@ Base template for Project overview.
         <div class="row mb-3">
             <div class="col">
                 <nav class="nav nav-pills flex-column flex-sm-row project-nav">
-                    <a class="flex-sm-fill text-center nav-link" href="@Projects.show(p.project.ownerName, p.project.slug)"><i class="fa fa-book"></i> @messages("project.docs")</a>
-                    <a class="flex-sm-fill text-center nav-link active" href="@Versions.showList(p.project.ownerName, p.project.slug, None)"><i class="fa fa-download"></i> @messages("project.versions")</a>
+                    <a id="docs" class="flex-sm-fill text-center nav-link" href="@Projects.show(p.project.ownerName, p.project.slug)"><i class="fa fa-book"></i> @messages("project.docs")</a>
+                    <a id="versions" class="flex-sm-fill text-center nav-link" href="@Versions.showList(p.project.ownerName, p.project.slug, None)"><i class="fa fa-download"></i> @messages("project.versions")</a>
                     @if(p.project.topicId != -1) {
-                        <a class="flex-sm-fill text-center nav-link" href="@Projects.showDiscussion(p.project.ownerName, p.project.slug)"><i class="fa fa-users"></i> @messages("project.discuss")</a>
+                        <a id="discussion" class="flex-sm-fill text-center nav-link" href="@Projects.showDiscussion(p.project.ownerName, p.project.slug)"><i class="fa fa-users"></i> @messages("project.discuss")</a>
                     }
                     @if(sp.perms(EditSettings)) {
-                        <a class="flex-sm-fill text-center nav-link" href="@Projects.showSettings(p.project.ownerName, p.project.slug)"><i class="fa fa-cog"></i> @messages("project.settings")</a>
+                        <a id="settings" class="flex-sm-fill text-center nav-link" href="@Projects.showSettings(p.project.ownerName, p.project.slug)"><i class="fa fa-cog"></i> @messages("project.settings")</a>
                     }
                     @p.settings.issues.map { issues =>
-                        <a class="flex-sm-fill text-center nav-link" href="@Projects.showIssues(p.project.ownerName, p.project.slug)"><i class="fa fa-bug"></i>
+                        <a id="issues" class="flex-sm-fill text-center nav-link" href="@Projects.showIssues(p.project.ownerName, p.project.slug)"><i class="fa fa-bug"></i>
                             Issues <i class="fa fa-external-link"></i></a>
                     }
                     @p.settings.source.map { source =>
-                        <a class="flex-sm-fill text-center nav-link" href="@Projects.showSource(p.project.ownerName, p.project.slug)"><i class="fa fa-code"></i>
+                        <a id="source" class="flex-sm-fill text-center nav-link" href="@Projects.showSource(p.project.ownerName, p.project.slug)"><i class="fa fa-code"></i>
                             Source <i class="fa fa-external-link"></i></a>
                     }
                 </nav>
