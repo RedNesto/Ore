@@ -11,18 +11,14 @@
 }
 
 nav.project-nav {
-  padding: 0.3em 0 0.3em 0;
+  border-bottom: 2px solid lighten($sponge_light_gray, 10);
 
   > .nav-link {
-    background: lighten($sponge_light_gray, 8);
-    border: 1px solid $sponge_light_gray;
-    margin-right: 0.3em;
-    color: white;
+    color: lighten($sponge_light_gray, 10);
     border-radius: 0;
-    padding: 6px 1em 6px 1em;
 
     &:hover {
-      color: $gray-focus;
+      color: $sponge_grey;
     }
 
     &:last-child {
@@ -30,9 +26,9 @@ nav.project-nav {
     }
 
     &.active {
-      background: $sponge_yellow;
-      color: $sponge_light_gray;
-      border: 1px solid darken($sponge_yellow, 10)
+      background: transparent;
+      color: lighten($sponge_light_gray, 10);
+      font-weight: 800;
     }
   }
 }
