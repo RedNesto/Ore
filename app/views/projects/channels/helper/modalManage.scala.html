@@ -2,14 +2,14 @@
 @import views.html.helper.{CSRF, form}
 @()(implicit messages: Messages, config: OreConfig, request: Request[_])
 
-<div class="modal fade" id="channel-settings" tabindex="-1" role="dialog" aria-labelledBy="settings-label">
+<div class="modal" id="channel-settings" tabindex="-1" role="dialog" aria-labelledBy="settings-label">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header">
+                <h4 class="modal-title"></h4>
                 <button type="button" class="close" data-dismiss="modal" aria-label="@messages("general.cancel")">
                     <span aria-hidden="true">&times;</span>
                 </button>
-                <h4 class="modal-title"></h4>
             </div>
             @form(action = routes.Application.showHome(None, None, None, None, None)) {
                 @CSRF.formField
