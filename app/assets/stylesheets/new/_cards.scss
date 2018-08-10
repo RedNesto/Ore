@@ -31,4 +31,9 @@
       }
     }
   }
+
+  // https://github.com/twbs/bootstrap/issues/17395
+  > table {
+    margin-bottom: 0px;
+  }
 }
