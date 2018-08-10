@@ -27,8 +27,8 @@ nav.project-nav {
 
     &.active {
       background: transparent;
-      color: lighten($sponge_light_gray, 10);
-      font-weight: 800;
+      color: lighten($sponge_light_gray, 0);
+      font-weight: bold;
     }
   }
 }
