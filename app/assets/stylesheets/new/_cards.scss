@@ -13,6 +13,16 @@
     }
   }
 
+  > .card-footer {
+    background: $sponge_dark_grey;
+    color: white;
+    border-radius: 0;
+
+    a {
+      color: white;
+    }
+  }
+
   > .list-group {
     &:last-child .list-group-item:last-child, .list-group-item:first-child {
       border-radius: 0;
