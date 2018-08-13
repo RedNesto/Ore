@@ -12,7 +12,7 @@
 @import models.admin.LoggedActionViewModel
 
 @(actions: Seq[LoggedActionViewModel], limit: Int, offset: Int, page: Int, size: Int, userFilter: Option[Int],
-        projectFilter: Option[Int], versionFilter: Option[Int], pageFilter: Option[Int], actionFilter: Option[Int], subjectFilter: Option[Int], canViewIP: Boolean)(implicit messages: Messages, request: OreRequest[_], config: OreConfig)
+        projectFilter: Option[Int], versionFilter: Option[Int], pageFilter: Option[Int], actionFilter: Option[Int], subjectFilter: Option[Int], canViewIP: Boolean)(implicit messages: Messages, request: OreRequest[_], config: OreConfig, flash: Flash)
 
 @bootstrap.layout(messages("admin.log.title")) {
 

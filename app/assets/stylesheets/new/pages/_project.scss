@@ -1,5 +1,5 @@
 .project-title {
-  font-size: 1.5em;
+  font-size: 1.5rem;
 
   a:hover {
     text-decoration: none;
@@ -10,25 +10,44 @@
   }
 }
 
-nav.project-nav {
-  border-bottom: 2px solid lighten($sponge_light_gray, 10);
-
-  > .nav-link {
-    color: lighten($sponge_light_gray, 10);
-    border-radius: 0;
-
-    &:hover {
-      color: $sponge_grey;
+.project-nav {
+  .nav-item {
+    .nav-link.active {
+      background: #f3f2f0;
+      border-bottom-color: #f3f2f0;
     }
+  }
+}
 
-    &:last-child {
-      margin-right: 0;
+.project-creation {
+  ul.card {
+    margin-bottom: 0;
+
+    li {
+      margin-bottom: 0.35rem;
     }
+  }
 
-    &.active {
-      background: transparent;
-      color: lighten($sponge_light_gray, 0);
-      font-weight: bold;
+  .sidebar {
+    .list-group-item {
+      display: flex;
+      align-items: center;
+
+      .fa-check, .fa-eye {
+        margin-left: auto;
+      }
+
+      .fa-check {
+        color: #3fa763;
+      }
+
+      .fa:not(.fa-check):not(.fa-eye) {
+        margin-right: 0.5rem;
+      }
+
+      &.disabled {
+        color: $gray-focus;
+      }
     }
   }
 }

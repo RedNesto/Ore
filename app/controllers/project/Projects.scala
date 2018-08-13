@@ -77,7 +77,7 @@ class Projects @Inject()(stats: StatTracker,
       val createdOrgas = orgas zip createOrga collect {
         case (orga, true) => orga
       }
-      Ok(views.create(createdOrgas.toSeq, None))
+      Ok(views.creation.step1())
     }
   }
 

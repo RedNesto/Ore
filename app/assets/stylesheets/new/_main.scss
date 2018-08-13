@@ -7,5 +7,15 @@
 @import "pages/project";
 
 .site-content > .container {
-  margin-top: 5em;
+  margin-top: 5rem;
+}
+
+.minor {
+  color: gray;
+}
+
+.list-group-item {
+  &:first-child, &:last-child {
+    border-radius: 0;
+  }
 }

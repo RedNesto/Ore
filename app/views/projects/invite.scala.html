@@ -13,7 +13,7 @@
 @(owner: User, pending: PendingProject, userList: List[User], registeredUsers: Int)(implicit executionContext: ExecutionContext, messages: Messages, flash: Flash, request: OreRequest[_],
         forums: OreDiscourseApi, config: OreConfig, currentUser: User)
 
-@projects.helper.panelCreate(messages("project.create"), 3) {
+@bootstrap.layout(messages("project.create")) {
     <!-- Start panel -->
     <div class="panel-body">
         <!-- Info -->

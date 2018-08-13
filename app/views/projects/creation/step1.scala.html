@@ -1,0 +1,37 @@
+@*
+Page used for uploading and creating new projects.
+*@
+@import controllers.sugar.Requests.OreRequest
+@import db.ModelService
+@import models.project.Project
+@import models.user.Organization
+@import ore.OreConfig
+@import ore.project.factory.PendingProject
+@import play.twirl.api.Html
+@import security.NonceFilter._
+@import views.html.helper.{CSRF, form}
+@import views.html.projects.creation.template
+
+@()(implicit messages: Messages, flash: Flash, request: OreRequest[_], config: OreConfig)
+
+@template(messages("project.create"), 1) {
+    <ul>
+        <li>@Html(messages("project.create.infoText.head"))</li>
+        <li>@Html(messages("project.create.infoText.guidelines"))</li>
+        <li>@Html(messages("project.create.infoText.bottom"))</li>
+        <li>@Html(messages("project.create.infoText.pgp"))</li>
+    </ul>
+
+    @form(action = controllers.project.routes.Projects.upload, 'enctype -> "multipart/form-data", 'id -> "form-upload", 'id -> "uploadFileForm") {
+        @CSRF.formField
+        <label class="btn btn-success" for="uploadFileInput">
+            <input id="uploadFileInput" name="pluginFile" class="d-none" type="file" />
+            Select plugin file
+        </label>
+
+        <label class="btn btn-success" for="uploadSignatureInput">
+            <input id="uploadSignatureInput" name="pluginSig" class="d-none" type="file" />
+            Select signature file
+        </label>
+    }
+}

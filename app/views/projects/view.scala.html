@@ -154,7 +154,7 @@ Base template for Project overview.
                                     Staff notes (@p.noteCount) </a></li>
                             }
                             @if(request.data.globalPerm(ViewLogs)) {
-                                <li><a href="@appRoutes.showLog(None, None, p.project.id, None, None)">
+                                <li><a href="@appRoutes.showLog(None, None, p.project.id, None, None, None, None)">
                                     User Action Logs</a></li>
                             }
                             @if(request.data.globalPerm(ViewLogs)) {
@@ -179,24 +179,36 @@ Base template for Project overview.
 
         <div class="row mb-3">
             <div class="col">
-                <nav class="nav nav-pills flex-column flex-sm-row project-nav">
-                    <a id="docs" class="flex-sm-fill text-center nav-link" href="@Projects.show(p.project.ownerName, p.project.slug)"><i class="fa fa-book"></i> @messages("project.docs")</a>
-                    <a id="versions" class="flex-sm-fill text-center nav-link" href="@Versions.showList(p.project.ownerName, p.project.slug, None)"><i class="fa fa-download"></i> @messages("project.versions")</a>
+                <ul class="nav nav-tabs project-nav">
+                    <li class="nav-item">
+                        <a id="docs" class="nav-link" href="@Projects.show(p.project.ownerName, p.project.slug)"><i class="fa fa-book"></i> @messages("project.docs")</a>
+                    </li>
+                    <li class="nav-item">
+                        <a id="versions" class="nav-link" href="@Versions.showList(p.project.ownerName, p.project.slug, None)"><i class="fa fa-download"></i> @messages("project.versions")</a>
+                    </li>
                     @if(p.project.topicId != -1) {
-                        <a id="discussion" class="flex-sm-fill text-center nav-link" href="@Projects.showDiscussion(p.project.ownerName, p.project.slug)"><i class="fa fa-users"></i> @messages("project.discuss")</a>
+                        <li class="nav-item">
+                            <a id="discussion" class="nav-link" href="@Projects.showDiscussion(p.project.ownerName, p.project.slug)"><i class="fa fa-users"></i> @messages("project.discuss")</a>
+                        </li>
                     }
                     @if(sp.perms(EditSettings)) {
-                        <a id="settings" class="flex-sm-fill text-center nav-link" href="@Projects.showSettings(p.project.ownerName, p.project.slug)"><i class="fa fa-cog"></i> @messages("project.settings")</a>
+                        <li class="nav-item">
+                            <a id="settings" class="nav-link" href="@Projects.showSettings(p.project.ownerName, p.project.slug)"><i class="fa fa-cog"></i> @messages("project.settings")</a>
+                        </li>
                     }
                     @p.settings.issues.map { issues =>
-                        <a id="issues" class="flex-sm-fill text-center nav-link" href="@Projects.showIssues(p.project.ownerName, p.project.slug)"><i class="fa fa-bug"></i>
-                            Issues <i class="fa fa-external-link"></i></a>
+                        <li class="nav-item">
+                            <a id="issues" class="nav-link" href="@Projects.showIssues(p.project.ownerName, p.project.slug)"><i class="fa fa-bug"></i>
+                                Issues <i class="fa fa-external-link"></i></a>
+                        </li>
                     }
                     @p.settings.source.map { source =>
-                        <a id="source" class="flex-sm-fill text-center nav-link" href="@Projects.showSource(p.project.ownerName, p.project.slug)"><i class="fa fa-code"></i>
-                            Source <i class="fa fa-external-link"></i></a>
+                        <li class="nav-item">
+                            <a id="source" class="nav-link" href="@Projects.showSource(p.project.ownerName, p.project.slug)"><i class="fa fa-code"></i>
+                                Source <i class="fa fa-external-link"></i></a>
+                        </li>
                     }
-                </nav>
+                </ul>
             </div>
         </div>
 
@@ -243,4 +255,3 @@ Base template for Project overview.
         @content
 
     }
-}
