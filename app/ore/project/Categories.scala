@@ -9,16 +9,16 @@ import slick.jdbc.JdbcType
   */
 object Categories extends Enumeration {
 
-  val AdminTools  =   Category( 0, "Admin Tools",       "fa-server")
-  val Chat        =   Category( 1, "Chat",              "fa-comment")
-  val DevTools    =   Category( 2, "Developer Tools",   "fa-wrench")
-  val Econ        =   Category( 3, "Economy",           "fa-money")
-  val Gameplay    =   Category( 4, "Gameplay",          "fa-puzzle-piece")
-  val Games       =   Category( 5, "Games",             "fa-gamepad")
-  val Protect     =   Category( 6, "Protection",        "fa-lock")
-  val Rp          =   Category( 7, "Role Playing",      "fa-magic")
-  val WorldMgmt   =   Category( 8, "World Management",  "fa-globe")
-  val Misc        =   Category( 9, "Miscellaneous",     "fa-asterisk")
+  val AdminTools  =   Category( 0, "Admin Tools",       "fas fa-server")
+  val Chat        =   Category( 1, "Chat",              "fas fa-comment")
+  val DevTools    =   Category( 2, "Developer Tools",   "fas fa-wrench")
+  val Econ        =   Category( 3, "Economy",           "fas fa-money-bill-alt")
+  val Gameplay    =   Category( 4, "Gameplay",          "fas fa-puzzle-piece")
+  val Games       =   Category( 5, "Games",             "fas fa-gamepad")
+  val Protect     =   Category( 6, "Protection",        "fas fa-lock")
+  val Rp          =   Category( 7, "Role Playing",      "fas fa-magic")
+  val WorldMgmt   =   Category( 8, "World Management",  "fas fa-globe")
+  val Misc        =   Category( 9, "Miscellaneous",     "fas fa-asterisk")
   val Undefined   =   Category(10, "Undefined",         null, isVisible = false)
 
   /**

@@ -135,7 +135,7 @@ sorted according to different criteria.
                     @messages("project.category.plural")
                     @if(visibleCategories.isDefined) {
                         <a href="@routes.Application.showHome(None, None, None, None, None)">
-                            <i class="category-reset fa fa-times"></i>
+                            <i class="category-reset fas fa-times"></i>
                         </a>
                     }
                 </div>
@@ -143,7 +143,7 @@ sorted according to different criteria.
                     @for(category <- Categories.visible) {
                         <a class="list-group-item list-group-item-action @if(visibleCategories.isDefined && visibleCategories.get.contains(category)) { active }"
                             href="@routes.Application.showHome(Some(Categories.toQueryStringWith(visibleCategories.getOrElse(Seq()), category)), query, Option(sort.id), Option(page), if (platform.isDefined) Some(platform.get.id.toString) else None)">
-                            <i class="fa @category.icon"></i>
+                            <i class="fa-fw @category.icon"></i>
                             @category.title
                         </a>
                     }

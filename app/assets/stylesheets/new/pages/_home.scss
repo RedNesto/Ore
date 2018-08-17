@@ -17,9 +17,13 @@
 }
 
 .card.categories {
-  .card-header {
+  > .card-header {
     font-weight: bold;
     justify-content: space-between;
     display: flex;
+  }
+
+  > .list-group > .list-group-item svg {
+    margin-right: 0.5rem;
   }
 }
