@@ -50,7 +50,6 @@ case class User(override val id: Option[Int] = None,
                 private var _tagline: Option[String] = None,
                 private var _globalRoles: List[RoleType] = List(),
                 private var _joinDate: Option[Timestamp] = None,
-                private var _avatarUrl: Option[String] = None,
                 private var _readPrompts: List[Prompt] = List(),
                 private var _pgpPubKey: Option[String] = None,
                 private var _lastPgpPubKeyUpdate: Option[Timestamp] = None,
@@ -220,17 +219,7 @@ case class User(override val id: Option[Int] = None,
     *
     * @return Avatar url
     */
-  def avatarUrl: Option[String] = this._avatarUrl
-
-  /**
-    * Sets this User's avatar url.
-    *
-    * @param _avatarUrl Avatar url
-    */
-  def setAvatarUrl(_avatarUrl: String) = {
-    this._avatarUrl = Option(_avatarUrl)
-    if (isDefined) update(AvatarUrl)
-  }
+  def avatarUrl: String = if(isProcessed) this.config.security.get[String]("api.avatarUrl").format(this.username) else ""
 
   /**
     * Returns this user's tagline.
@@ -389,13 +378,6 @@ case class User(override val id: Option[Int] = None,
       this.setUsername(user.username)
       this.setEmail(user.email)
       this.setLang(user.lang)
-      user.avatarUrl.map { url =>
-        if (!url.startsWith("http")) {
-          val baseUrl = config.security.get[String]("api.url")
-          baseUrl + url
-        } else
-          url
-      }.foreach(this.setAvatarUrl)
     }
   }
 

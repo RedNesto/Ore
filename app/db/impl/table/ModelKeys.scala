@@ -62,7 +62,6 @@ object ModelKeys {
   val Tagline               =   new StringKey[User](_.tagline, _.tagline.orNull)
   val GlobalRoles           =   new Key[User, List[RoleType]](_.globalRoles, _.globalRoles.toList)
   val JoinDate              =   new TimestampKey[User](_.joinDate, _.joinDate.orNull)
-  val AvatarUrl             =   new StringKey[User](_.avatarUrl, _.avatarUrl.orNull)
   val ReadPrompts           =   new Key[User, List[Prompt]](_.readPrompts, _.readPrompts.toList)
   val Language              =   new Key[User, Lang](_.lang, _.lang.orNull)
 

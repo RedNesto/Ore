@@ -325,13 +325,11 @@ final class ApiController @Inject()(api: OreRestfulApi,
           val email = query.get("email")
           val username = query.get("username")
           val name = query.get("name")
-          val avatar_url = query.get("avatar_url")
           val add_groups = query.get("add_groups")
 
           email.foreach(user.setEmail)
           username.foreach(user.setUsername)
           name.foreach(user.setFullName)
-          avatar_url.foreach(user.setAvatarUrl)
           add_groups.foreach { groups =>
             user.setGlobalRoles(
               if (groups.trim == "")

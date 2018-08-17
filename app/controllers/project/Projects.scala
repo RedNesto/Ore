@@ -326,7 +326,7 @@ class Projects @Inject()(stats: StatTracker,
     this.projects.withSlug(author, slug).semiFlatMap { project =>
       this.projects.fileManager.getIconPath(project) match {
         case None =>
-          project.owner.user.map(_.avatarUrl.map(Redirect(_)).getOrElse(NotFound))
+          project.owner.user.map(user => Redirect(user.avatarUrl))
         case Some(iconPath) =>
           Future.successful(showImage(iconPath))
       }
