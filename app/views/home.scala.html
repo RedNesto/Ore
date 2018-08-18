@@ -61,16 +61,16 @@ sorted according to different criteria.
     <script type="text/javascript" src="@routes.Assets.at("javascripts/home.js")"></script>
 
     <script nonce="@nonce">
-    @if(visibleCategories.isDefined) {
-    CATEGORY_STRING = "@visibleCategories.get.map(_.id).mkString(",")";
-    }
-    @if(!sort.equals(ProjectSortingStrategies.Default)) {
-    SORT_STRING = "@sort.id";
-    }
-    @if(request.getQueryString("q").isDefined) {
-    QUERY_STRING = "@request.getQueryString("q").get";
-    }
-    currentlyLoaded = @models.size;
+        @if(visibleCategories.isDefined) {
+            CATEGORY_STRING = "@Categories.toQueryString(visibleCategories.get)";
+        }
+        @if(!sort.equals(ProjectSortingStrategies.Default)) {
+            SORT_STRING = "@sort.id";
+        }
+        @if(request.getQueryString("q").isDefined) {
+            QUERY_STRING = "@request.getQueryString("q").get";
+        }
+        currentlyLoaded = @models.size;
     </script>
 }
 

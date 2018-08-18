@@ -2,8 +2,8 @@ package controllers
 
 import java.sql.Timestamp
 import java.time.Instant
-import javax.inject.Inject
 
+import javax.inject.Inject
 import controllers.sugar.Bakery
 import controllers.sugar.Requests.AuthRequest
 import db.access.ModelAccess
@@ -35,8 +35,8 @@ import util.instances.future._
 import views.{html => views}
 
 import scala.concurrent.{ExecutionContext, Future}
-
 import play.api.mvc.{Action, ActionBuilder, AnyContent}
+import play.api.routing.JavaScriptReverseRouter
 
 /**
   * Main entry point for application.
@@ -62,6 +62,14 @@ final class Application @Inject()(data: DataHelper,
   def linkOut(remoteUrl: String) = OreAction { implicit request =>
     implicit val headerData: HeaderData = request.data
     Ok(views.linkout(remoteUrl))
+  }
+
+  def javascriptRoutes = Action { implicit request =>
+    Ok(
+      JavaScriptReverseRouter("jsRoutes")(
+        routes.javascript.Application.showHome
+      )
+    ).as("text/javascript")
   }
 
   private def queryProjectRV = {

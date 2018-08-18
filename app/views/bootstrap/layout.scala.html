@@ -32,7 +32,6 @@ this.
         <meta name="theme-color" content="#333">
 
         @if(scriptsEnabled) {
-            <script type="text/javascript" src="@routes.Assets.at("lib/jquery/dist/jquery.min.js")"></script>
             <script defer type="text/javascript" src="@routes.Assets.at("lib/font-awesome/js/all.min.js")"></script>
         }
     </head>
@@ -59,6 +58,8 @@ this.
         }
 
         @if(scriptsEnabled) {
+            <script type="text/javascript" src="@routes.Application.javascriptRoutes"></script>
+            <script type="text/javascript" src="@routes.Assets.at("lib/jquery/dist/jquery.min.js")"></script>
             <script type="text/javascript" src="@routes.Assets.at("lib/moment/min/moment.min.js")"></script>
             <script type="text/javascript" src="@routes.Assets.at("lib/popper.js/dist/umd/popper.min.js")"></script>
             <script type="text/javascript" src="@routes.Assets.at("lib/bootstrap/dist/js/bootstrap.min.js")"></script>
