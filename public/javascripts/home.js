@@ -6,8 +6,8 @@
  * |_____|_| |___|_|_| |___|
  *                 |___|
  *
- * By Walker Crouse (windy) and contributors
- * (C) SpongePowered 2016-2017 MIT License
+ * By the Ore team and contributors
+ * (C) SpongePowered 2016-2018 MIT License
  * https://github.com/SpongePowered/Ore
  *
  * Home page specific script
@@ -24,8 +24,6 @@
 var CATEGORY_STRING = null;
 var SORT_STRING = null;
 var QUERY_STRING = null;
-
-var currentlyLoaded = 0;
 
 /*
  * ==================================================
@@ -47,7 +45,6 @@ $(function() {
             $(this).next().find('.btn').click();
         }
     });
-
     searchBar.find('.btn').click(function() {
         var query = $(this).closest('.input-group').find('input').val();
         console.log(CATEGORY_STRING)

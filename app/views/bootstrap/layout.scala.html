@@ -24,6 +24,7 @@ this.
         <link rel="stylesheet" type="text/css" href="@routes.Assets.at("highlight/styles/default.css")" />
         <link rel="stylesheet" type="text/css" href="@routes.Assets.at("lib/bootstrap/dist/css/bootstrap.min.css")" />
         <link rel="stylesheet" type="text/css" href="@routes.Assets.at("stylesheets/main.css")" />
+        <link rel="stylesheet" type="text/css" href="@routes.Assets.at("lib/font-awesome/css/svg-with-js.css")"/>
 
         <!-- See https://goo.gl/OOhYW5 -->
         <link rel="manifest" href="@routes.Assets.at("manifest/manifest.json")">
@@ -32,7 +33,7 @@ this.
         <meta name="theme-color" content="#333">
 
         @if(scriptsEnabled) {
-            <script defer type="text/javascript" src="@routes.Assets.at("lib/font-awesome/js/all.min.js")"></script>
+            <script defer type="text/javascript" src="@routes.Assets.at("lib/font-awesome/js/all.min.js")" data-auto-add-css="false"></script>
         }
     </head>
     <body class="site">
