@@ -85,12 +85,10 @@ $(function() {
 
     searchBar.find('.btn').click(function() {
         var query = $(this).closest('.input-group').find('input').val();
-        if(query.trim() !== "") {
-            var url = '/?q=' + query;
-            if (CATEGORY_STRING) url += '&categories=' + CATEGORY_STRING;
-            if (SORT_STRING) url += '&sort=' + SORT_STRING;
-            go(url);
-        }
+        var url = '/?q=' + query;
+        if (CATEGORY_STRING) url += '&categories=' + CATEGORY_STRING;
+        if (SORT_STRING) url += '&sort=' + SORT_STRING;
+        go(url);
     });
 
     // Initialize more button

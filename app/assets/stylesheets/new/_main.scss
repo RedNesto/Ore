@@ -19,3 +19,53 @@
     border-radius: 0;
   }
 }
+
+.pagination {
+  > .page-item, .page-item:last-child, .page-item:first-child {
+    > .page-link {
+      border-radius: 0;
+      @extend .btn-gray;
+    }
+
+    &.active > .page-link {
+      @extend .btn-yellow;
+    }
+
+    &.disabled {
+      cursor: not-allowed;
+
+      > .page-link {
+        @extend .btn-disabled;
+      }
+    }
+  }
+}
+
+.icon {
+  border-radius: 4px;
+
+  &.xxs {
+    width: 26px;
+    height: 26px;
+  }
+
+  &.xs {
+    width: 32px;
+    height: 32px;
+  }
+
+  &.s {
+    width: 40px;
+    height: 40px;
+  }
+
+  &.sm {
+    width: 50px;
+    height: 50px;
+  }
+
+  &.md {
+    width: 100px;
+    height: 100px;
+  }
+}

@@ -99,19 +99,19 @@ sorted according to different criteria.
 
     <div class="row">
         <div class="col-md-9">
-            <div class="input-group mb-3 project-search">
-                <input type="text" class="form-control" placeholder="Search in projects..." aria-label="Search query" aria-describedby="search-button-addon">
+            <div class="input-group project-search mb-3">
+                <input type="text" class="form-control" placeholder="Search in projects..." aria-label="Search query" aria-describedby="search-button-addon" value="@query.getOrElse("")">
                 <div class="input-group-append">
                     <button class="btn btn-yellow" type="button" id="search-button-addon">Search</button>
                 </div>
             </div>
 
             @if(query.isDefined) {
-                <li class="list-group-item minor search-header">
-                    <span class="pull-left">Showing results for: <i>@query</i></span>
-                    <i class="fa fa-times pull-right dismiss"></i>
-                    <div class="clearfix"></div>
-                </li>
+                <div class="queryRemoval mb-3">
+                    <a href="@routes.Application.showHome(Some(Categories.toQueryString(visibleCategories.getOrElse(Seq()))), None, Option(sort.id), None, if (platform.isDefined) Some(platform.get.id.toString) else None)">
+                        <i class="fa fa-window-close"></i> Clear current search query
+                    </a>
+                </div>
             }
 
             @projects.list(
@@ -134,7 +134,7 @@ sorted according to different criteria.
                 <div class="card-header">
                     @messages("project.category.plural")
                     @if(visibleCategories.isDefined) {
-                        <a href="@routes.Application.showHome(None, None, None, None, None)">
+                        <a href="@routes.Application.showHome(None, query, Option(sort.id), None, if (platform.isDefined) Some(platform.get.id.toString) else None)">
                             <i class="category-reset fas fa-times"></i>
                         </a>
                     }

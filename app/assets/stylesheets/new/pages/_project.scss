@@ -51,3 +51,26 @@
     }
   }
 }
+
+.project-list-nav .pagination {
+  display: flex;
+  justify-content: space-between;
+}
+
+.project-list {
+  > .project {
+    background: #ffffff;
+    padding: 0.5rem;
+    border: 1px solid $gray-lines;
+
+    a {
+      font-weight: bold;
+      color: $sponge_light_gray;
+
+      &:hover {
+        color: $sponge_grey;
+        text-decoration: none;
+      }
+    }
+  }
+}
